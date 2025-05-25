@@ -1,0 +1,72 @@
+---
+description: quizizz
+globs: 
+---
+
+# Your rule content
+
+my-app/
+├── prisma/                    
+│   ├── schema.prisma          # Định nghĩa model, datasource, generator
+│   └── migrations/            # Các migration do Prisma generate
+│
+├── src/
+│   ├── config/
+│   │   └── index.ts           # Đọc biến môi trường, khởi tạo config chung
+│   │
+│   ├── shared/                # Layer dùng chung toàn app
+│   │   ├── db/
+│   │   │   └── client.ts      # export const prisma = new PrismaClient()
+│   │   ├── errors/
+│   │   │   └── AppError.ts    # custom Error class
+│   │   ├── middleware/
+│   │   │   ├── errorHandler.ts
+│   │   │   └── validate.ts    # validate DTO bằng Zod/Joi
+│   │   └── utils/             
+│   │       └── logger.ts      # winston hoặc pino
+│   │
+│   ├── modules/               # Mỗi feature/domain 1 folder
+│   │   ├── auth/
+│   │   │   ├── dtos/
+│   │   │   │   └── login.dto.ts
+│   │   │   ├── controllers/
+│   │   │   │   └── auth.controller.ts
+│   │   │   ├── services/
+│   │   │   │   └── auth.service.ts
+│   │   │   ├── routes.ts
+│   │   │   └── auth.module.ts  # kết nối controller + service (nếu dùng DI)
+│   │   │
+│   │   └── user/
+│   │       ├── dtos/
+│   │       │   └── create-user.dto.ts
+│   │       ├── controllers/
+│   │       │   └── user.controller.ts
+│   │       ├── services/
+│   │       │   └── user.service.ts
+│   │       ├── routes.ts
+│   │       └── user.module.ts
+│   │
+│   ├── app.ts                 # Khởi tạo Express, gắn middleware, register routes
+│   └── server.ts              # import app.ts, app.listen(), graceful shutdown
+│
+├── tests/                     # Jest/Supertest
+│   ├── auth.e2e-spec.ts
+│   └── user.e2e-spec.ts
+│
+├── .env                       # DATABASE_URL, JWT_SECRET, PORT…
+├── .gitignore
+├── package.json
+├── tsconfig.json
+└── README.md
+
+### Ví dụ prompt chuẩn
+```
+Tạo một controller mới cho tính năng [tên tính năng] với các yêu cầu sau:
+- Tuân thủ cấu trúc controller hiện tại trong src/controllers
+- Sử dụng các decorators từ thư viện X
+- Implement các phương thức CRUD cơ bản
+- Thêm xử lý lỗi theo ErrorHandler hiện có
+- Tuân thủ quy tắc đặt tên kebab-case.ts cho file
+- Đảm bảo 100% type safety
+
+Tham khảo file mẫu: src/controllers/quiz-controller.ts

@@ -1,0 +1,160 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Mô hình người dùng
+model User {
+  id             String         @id @default(uuid())
+  email          String?        @unique
+  password       String?
+  fullName       String
+  role           UserRole       @default(STUDENT)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  quizzes        Quiz[]         @relation("CreatedQuizzes")
+  participations Participant[]
+  sessions       QuizSession[]  @relation("ProctorSessions")
+  isGuest        Boolean        @default(false)
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  PROCTOR
+  STUDENT
+}
+
+// Mô hình bài kiểm tra
+model Quiz {
+  id          String        @id @default(uuid())
+  title       String
+  description String?       @db.Text
+  timeLimit   Int?          // Thời gian làm bài (giây)
+  isPublic    Boolean       @default(false)
+  code        String?       @unique // Mã tham gia
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  creatorId   String
+  creator     User          @relation("CreatedQuizzes", fields: [creatorId], references: [id])
+  questions   QuizQuestion[]
+  sessions    QuizSession[]
+
+  @@map("quizzes")
+}
+
+// Mô hình câu hỏi
+model QuizQuestion {
+  id              String           @id @default(uuid())
+  content         String           @db.Text
+  type            QuestionType
+  timeLimit       Int?             // Thời gian làm câu hỏi (giây)
+  points          Int              @default(1)
+  difficulty      QuestionDifficulty @default(MEDIUM)
+  order           Int              // Thứ tự xuất hiện
+  imageUrl        String?
+  videoUrl        String?
+  quizId          String
+  quiz            Quiz             @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  options         QuestionOption[]
+  answers         Answer[]
+
+  @@map("quiz_questions")
+}
+
+enum QuestionType {
+  MCQ             // Trắc nghiệm một đáp án
+  TRUE_FALSE      // Đúng/Sai
+  MULTIPLE_SELECT // Nhiều đáp án
+  MATCHING        // Ghép đôi
+  ESSAY           // Tự luận (phát triển tương lai)
+}
+
+enum QuestionDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+// Mô hình đáp án câu hỏi
+model QuestionOption {
+  id              String        @id @default(uuid())
+  content         String        @db.Text
+  isCorrect       Boolean       @default(false)
+  order           Int           // Thứ tự xuất hiện
+  imageUrl        String?
+  matchingText    String?       // Văn bản ghép đôi (cho câu hỏi MATCHING)
+  questionId      String
+  question        QuizQuestion  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answers         Answer[]
+
+  @@map("question_options")
+}
+
+// Mô hình phiên kiểm tra
+model QuizSession {
+  id              String        @id @default(uuid())
+  status          SessionStatus @default(PENDING)
+  startTime       DateTime?
+  endTime         DateTime?
+  code            String        @unique // Mã phòng
+  quizId          String
+  quiz            Quiz          @relation(fields: [quizId], references: [id])
+  proctorId       String
+  proctor         User          @relation("ProctorSessions", fields: [proctorId], references: [id])
+  participants    Participant[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("quiz_sessions")
+}
+
+enum SessionStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+// Mô hình người tham gia
+model Participant {
+  id              String        @id @default(uuid())
+  joinTime        DateTime      @default(now())
+  score           Int           @default(0)
+  rank            Int?          // Xếp hạng
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+  sessionId       String
+  session         QuizSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  answers         Answer[]
+  
+  @@unique([userId, sessionId])
+  @@map("participants")
+}
+
+// Mô hình câu trả lời của người tham gia
+model Answer {
+  id              String        @id @default(uuid())
+  answerTime      DateTime      @default(now())
+  isCorrect       Boolean       @default(false)
+  points          Int           @default(0)
+  responseTime    Int?          // Thời gian trả lời (milliseconds)
+  participantId   String
+  participant     Participant   @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  questionId      String
+  question        QuizQuestion  @relation(fields: [questionId], references: [id])
+  optionId        String?       // Null cho câu hỏi tự luận
+  option          QuestionOption? @relation(fields: [optionId], references: [id])
+  essayAnswer     String?       @db.Text // Cho câu hỏi tự luận
+  
+  @@unique([participantId, questionId])
+  @@map("answers")
+}

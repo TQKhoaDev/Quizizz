@@ -1,0 +1,47 @@
+### Kiểm tra trạng thái API
+GET http://localhost:3001/api/health
+
+### Đăng nhập với tài khoản admin
+POST http://localhost:3001/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@quizizz.com",
+  "password": "admin123"
+}
+
+### Đăng nhập với tài khoản giáo viên
+POST http://localhost:3001/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "proctor@quizizz.com",
+  "password": "proctor123"
+}
+
+### Đăng nhập với tài khoản học sinh
+POST http://localhost:3001/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "student1@quizizz.com",
+  "password": "student123"
+}
+
+### Đăng ký tài khoản mới
+POST http://localhost:3001/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "newuser@quizizz.com",
+  "password": "Password123",
+  "fullName": "Người Dùng Mới",
+  "role": "STUDENT"
+}
+
+### Lấy thông tin người dùng hiện tại
+GET http://localhost:3001/api/auth/me
+Authorization: Bearer YOUR_TOKEN_HERE
+
+### Đăng xuất
+POST http://localhost:3001/api/auth/logout 
