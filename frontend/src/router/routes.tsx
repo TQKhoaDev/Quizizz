@@ -8,10 +8,10 @@ import ProtectedRoute from "./ProtectedRoute";
 // Pages
 import Home from "@/features/Home";
 import Dashboard from "@/features/dasboard";
-import Login from "@/features/Auth/pages/Login";
-import Register from "@/features/Auth/pages/Register";
-import QuizList from "@/features/Quiz";
-import SessionPage from "@/features/Session/index";
+import Login from "@/features/Auth/pages/login";
+import Register from "@/features/Auth/pages/register";
+import QuizList from "@/features/Quiz/pages/quiz";
+import SessionPage from "@/features/Session/pages/session";
 import NotFound from "@/features/NotFound";
 
 // Tạo các routes cho ứng dụng
