@@ -19,13 +19,13 @@ export const prisma = new PrismaClient();
 // Tạo ứng dụng Express
 const app: Express = express();
 const httpServer = http.createServer(app); // Tạo HTTP server riêng
-const port = process.env.PORT || 3001;
+const port = process.env.PORT ;
 
 // Middleware
 app.use(
   cors({
     origin:
-      process.env.NODE_ENV === 'production' ? process.env.FRONTEND_URL : 'http://localhost:3000',
+      process.env.NODE_ENV === 'production' ? process.env.FRONTEND_URL : 'http://localhost:5173',
     credentials: true,
   })
 );
