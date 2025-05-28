@@ -1,10 +1,29 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Eye, Play, Users, Clock } from "lucide-react"
-import { mockSessions } from "../../dasboard/models"
+import { AlertCircle, Loader2, Plus } from "lucide-react"
+import { useSessionManagement } from "../hooks/useSessionManagement"
+import { CreateSessionDialog } from "../components/CreateSessionDialog"
+import { EmptySessionState } from "../components/EmptySessionState"
+import { SessionList } from "../components/SessionList"
 
 export default function SessionTab() {
+  const {
+    sessions,
+    quizzes,
+    isSessionLoading,
+    isQuizzesLoading,
+    error,
+    isCreateSessionOpen,
+    newSession,
+    handleQuizChange,
+    handleCreateSession,
+    handleStartSession,
+    handleEndSession,
+    handleCancelSession,
+    handleViewSession,
+    openCreateSessionDialog,
+    setIsCreateSessionOpen
+  } = useSessionManagement();
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
@@ -12,56 +31,60 @@ export default function SessionTab() {
           <h2 className="text-2xl font-bold">Quản lý Phiên học</h2>
           <p className="text-gray-600">Theo dõi các phiên học trực tiếp</p>
         </div>
-        <Button className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 w-full sm:w-auto">
-          <Play className="w-4 h-4 mr-2" />
+        <Button 
+          onClick={openCreateSessionDialog}
+          className="bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 w-full sm:w-auto"
+        >
+          <Plus className="w-4 h-4 mr-2" />
           Tạo phiên mới
         </Button>
       </div>
 
-      <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-        {mockSessions.map((session) => (
-          <Card key={session.id} className="relative overflow-hidden">
-            <div
-              className={`absolute top-0 left-0 w-full h-1 ${session.status === "live" ? "bg-green-500" : "bg-gray-300"}`}
-            />
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <CardTitle className="text-lg leading-tight">{session.quizTitle}</CardTitle>
-                <Badge
-                  variant={session.status === "live" ? "default" : "secondary"}
-                  className="ml-2 flex-shrink-0"
-                >
-                  {session.status === "live" ? "Live" : "Kết thúc"}
-                </Badge>
-              </div>
-              <CardDescription>Mã: {session.code}</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="space-y-2 mb-4">
-                <div className="flex items-center text-sm text-gray-600">
-                  <Users className="w-4 h-4 mr-2 flex-shrink-0" />
-                  {session.participants} người tham gia
-                </div>
-                <div className="flex items-center text-sm text-gray-600">
-                  <Clock className="w-4 h-4 mr-2 flex-shrink-0" />
-                  Bắt đầu lúc {session.startTime}
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="flex-1">
-                  <Eye className="w-4 h-4 mr-1" />
-                  Xem
-                </Button>
-                {session.status === "live" && (
-                  <Button size="sm" variant="destructive" className="flex-1">
-                    Kết thúc
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {/* Dialog tạo phiên mới */}
+      <CreateSessionDialog
+        isOpen={isCreateSessionOpen}
+        onOpenChange={setIsCreateSessionOpen}
+        quizzes={quizzes}
+        isQuizzesLoading={isQuizzesLoading}
+        newSession={newSession}
+        onQuizChange={handleQuizChange}
+        onCreateSession={handleCreateSession}
+      />
+
+      {/* Hiển thị thông báo lỗi nếu có */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-800 rounded-md p-4 flex items-center">
+          <AlertCircle className="h-5 w-5 mr-2" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* Hiển thị loading */}
+      {isSessionLoading && (
+        <div className="flex justify-center items-center p-8">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+          <span className="ml-2 text-gray-500">Đang tải...</span>
+        </div>
+      )}
+
+      {/* Hiển thị khi không có session nào */}
+      {!isSessionLoading && sessions.length === 0 && !error && (
+        <EmptySessionState 
+          onCreateSession={openCreateSessionDialog}
+          hasQuizzes={quizzes.length > 0}
+        />
+      )}
+
+      {/* Hiển thị danh sách session */}
+      {!isSessionLoading && sessions.length > 0 && (
+        <SessionList
+          sessions={sessions}
+          onStart={handleStartSession}
+          onEnd={handleEndSession}
+          onCancel={handleCancelSession}
+          onView={handleViewSession}
+        />
+      )}
     </div>
   )
 } 

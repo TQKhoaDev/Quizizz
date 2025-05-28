@@ -110,7 +110,6 @@ export default function QuizTab() {
           <h2 className="text-2xl font-bold">Quản lý Quiz</h2>
           <p className="text-gray-600">Tạo và quản lý các bài quiz</p>
         </div>
-
         <Dialog open={isCreateQuizOpen} onOpenChange={setIsCreateQuizOpen}>
           <DialogTrigger asChild>
             <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 w-full sm:w-auto">
@@ -201,6 +200,7 @@ export default function QuizTab() {
         <div className="block md:hidden space-y-4">
           {quizzes.map((quiz) => (
             <Card key={quiz.id}>
+              
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0">

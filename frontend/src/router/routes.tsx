@@ -13,6 +13,8 @@ import Register from "@/features/Auth/pages/register";
 import QuizList from "@/features/Quiz/pages/quiz";
 import SessionPage from "@/features/Session/pages/session";
 import NotFound from "@/features/NotFound";
+import QuizPage from "@/features/participant/pages/QuizPage";
+import { ParticipantProvider } from "@/features/participant/contexts/ParticipantContext";
 
 // Tạo các routes cho ứng dụng
 const router = createBrowserRouter([
@@ -29,6 +31,10 @@ const router = createBrowserRouter([
         path: "play/:code",
         // Trang chơi quiz sẽ được tạo sau
         element: <div>Trang chơi quiz - Tham gia phòng</div>,
+      },
+      {
+        path: "quiz/join/:quizCode",
+        element: <ParticipantProvider><QuizPage /></ParticipantProvider>,
       },
       {
         path: "*",
