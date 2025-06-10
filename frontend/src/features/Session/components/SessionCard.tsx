@@ -3,19 +3,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Eye, Play, Users, Clock, X, Square } from "lucide-react"
 import type { Session } from "../api/sessionApi"
+import { useNavigate } from 'react-router-dom';
 
 interface SessionCardProps {
   session: Session;
-  onStart?: (sessionId: string) => void;
-  onEnd?: (sessionId: string) => void;
-  onCancel?: (sessionId: string) => void;
-  onView?: (sessionId: string) => void;
+  onStart?: (id: string) => void;
+  onEnd?: (id: string) => void;
+  onCancel?: (id: string) => void;
 }
 
 /**
  * Component hiển thị thông tin chi tiết của một phiên học
  */
-export const SessionCard = ({ session, onStart, onEnd, onCancel, onView }: SessionCardProps) => {
+export const SessionCard = ({ session, onStart, onEnd, onCancel }: SessionCardProps) => {
+  const navigate = useNavigate();
+
+  const handleView = () => {
+    navigate(`/dashboard/sessions/${session.id}/control`);
+  };
+
   // Hàm định dạng trạng thái session
   const formatStatus = (status: string) => {
     switch (status) {
@@ -97,7 +103,7 @@ export const SessionCard = ({ session, onStart, onEnd, onCancel, onView }: Sessi
             size="sm" 
             variant="outline" 
             className="flex-1"
-            onClick={() => onView ? onView(session.id) : null}
+            onClick={handleView}
           >
             <Eye className="w-4 h-4 mr-1" />
             Xem

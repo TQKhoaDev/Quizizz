@@ -93,7 +93,6 @@ export default function QuizTab() {
     
     try {
       const data = await quizApi.getQuizzes()
-      console.log(data)
       setQuizzes(data)
     } catch (err) {
       console.error("Lỗi khi lấy danh sách quiz:", err)

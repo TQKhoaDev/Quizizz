@@ -1,29 +1,7 @@
-import { participantApi } from './api/participantApi';
-import { QuestionController } from './components/QuestionController';
-import { QuizPlayer } from './components/QuizPlayer';
-import { MCQQuestion, TrueFalseQuestion, MultipleSelectQuestion } from './components/QuestionTypes';
-import type { Question, QuestionType, QuestionOption } from './components/QuestionTypes';
-import { ParticipantProvider, useParticipant } from './contexts/ParticipantContext';
-import QuizPage from './pages/QuizPage';
+// Export API
+export { participantApi } from './api/participantApi';
 
-export {
-  // API
-  participantApi,
-  
-  // Components
-  QuestionController,
-  QuizPlayer,
-  MCQQuestion,
-  TrueFalseQuestion,
-  MultipleSelectQuestion,
-  
-  // Context
-  ParticipantProvider,
-  useParticipant,
-  
-  // Pages
-  QuizPage,
-};
+import ResultPage from './pages/ResultPage';
 
-// Types
-export type { Question, QuestionType, QuestionOption };
+export { ResultPage };
+

@@ -3,6 +3,20 @@ import axios from 'axios';
 // Cấu hình base URL cho API
 const API_URL = import.meta.env.VITE_API_BACKEND || 'http://localhost:3001/api';
 
+export interface Participant {
+    id: string;
+    joinTime: string;
+    score: number;
+    rank: number | null;
+    userId: string;
+    user: {
+        id: string;
+        fullName: string;
+        email: string | null;
+        isGuest: boolean;
+    };
+}
+
 export interface Session {
     id: string;
     status: 'PENDING' | 'ACTIVE' | 'ENDED' | 'CANCELED';
@@ -19,6 +33,8 @@ export interface Session {
     _count?: {
         participants?: number;
     };
+    participants?: Participant[];
+    code?: string;
     createdAt: string;
     updatedAt: string;
 }
@@ -108,8 +124,14 @@ export const sessionApi = {
     // Lấy một phiên theo ID
     getSessionById: async (id: string): Promise<Session | null> => {
         try {
-            const response = await axios.get(`${API_URL}/sessions/${id}`);
-            return response.data;
+            console.log("id",id);
+            const response = await axios.get<{ data: Session }>(`${API_URL}/sessions/${id}`, {
+                headers: {
+                  Authorization: `Bearer ${localStorage.getItem('token')}`
+                }
+              });
+              console.log("response",response);
+            return response.data.data;
         } catch (error) {
             console.error(`Lỗi khi lấy phiên có ID ${id}:`, error);
             // Trả về phiên mẫu nếu ID trùng khớp

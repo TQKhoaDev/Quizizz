@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Cấu hình base URL cho API
-const API_URL = import.meta.env.VITE_API_BACKEND || 'http://localhost:3001/api';
+const API_URL = import.meta.env.VITE_API_BACKEND || '';
 
 // Interface định nghĩa cấu trúc dữ liệu Quiz từ API
 interface QuizResponseData {
@@ -75,6 +75,65 @@ export interface Quiz {
   createdAt: string;
   code?: string;
 }
+export interface JoinQuiz {
+    code: string
+    displayName: string
+}
+export interface QuestionOption {
+  id: string;
+  content: string;
+  isCorrect: boolean;
+  order: number;
+  imageUrl: string | null;
+  matchingText: string | null;
+  questionId: string;
+}
+
+export interface Question {
+  id: string;
+  content: string;
+  type: string;
+  timeLimit: number;
+  points: number;
+  difficulty: string;
+  order: number;
+  imageUrl: string | null;
+  videoUrl: string | null;
+  quizId: string;
+  options: QuestionOption[];
+}
+
+/**
+ * Tham gia quiz
+ */
+export interface JoinQuizResponse {
+  session: {
+    id: string;
+    code: string;
+    status: string;
+    startTime: string | null;
+    endTime: string | null;
+  };
+  quiz: {
+    id: string;
+    title: string;
+    description: string;
+    timeLimit: number;
+    isPublic: boolean;
+    code: string;
+    createdAt: string;
+    updatedAt: string;
+    creatorId: string;
+  };
+  participant: {
+    id: string;
+    joinTime: string;
+    score: number;
+    rank: number | null;
+    userId: string;
+    sessionId: string;
+  };
+}
 
 // API service cho Quiz
 export const quizApi = {
@@ -114,14 +173,34 @@ export const quizApi = {
    * Lấy chi tiết một quiz theo ID
    */
   getQuizById: async (id: string): Promise<QuizDetail> => {
-    const response = await axios.get<{ data: QuizDetail }>(`${API_URL}/quizzes/${id}`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('token')}`
-      }
-    });
+    const response = await axios.get<{ data: QuizDetail }>(`${API_URL}/quizzes/${id}`);
     return response.data.data;
   },
-
+  /**
+   * Lấy chi tiết một quiz theo mã tham gia
+   */
+  getQuizByCode: async (code: string): Promise<QuizDetail> => {
+    const response = await axios.get<{ data: QuizDetail }>(`${API_URL}/quizzes/code/${code}`);
+    return response.data.data;
+  },
+  /**
+   * Tham gia quiz
+   */
+  joinQuiz: async (data: JoinQuiz): Promise<JoinQuizResponse> => {
+    try {
+      console.log(data);
+      const response = await axios.post<{ data: JoinQuizResponse }>(`${API_URL}/quizzes/join`, data);
+      console.log(response.data.data);
+      return response.data.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        // Trả về chi tiết lỗi từ response của backend
+        throw error.response.data;
+      }
+      // Nếu không phải lỗi từ backend, ném lại lỗi nguyên bản
+      throw error;
+    }
+  },
   /**
    * Tạo quiz mới
    */
