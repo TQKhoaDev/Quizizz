@@ -93,6 +93,36 @@ class SessionController {
       data: session
     });
   }
+  
+  /**
+   * Chuyển sang câu hỏi tiếp theo
+   */
+  async nextQuestion(req: Request, res: Response) {
+    const { sessionId } = req.params;
+    const userId = req.user!.id;
+    
+    const session = await sessionService.nextQuestion(sessionId, userId);
+    
+    res.status(200).json({
+      success: true,
+      data: session
+    });
+  }
+  
+  /**
+   * Lấy thông tin câu hỏi đã qua
+   */
+  async getQuestionHistory(req: Request, res: Response) {
+    const { sessionId } = req.params;
+    const userId = req.user!.id;
+    
+    const history = await sessionService.getQuestionHistory(sessionId, userId);
+    
+    res.status(200).json({
+      success: true,
+      data: history
+    });
+  }
 }
 
 export const sessionController = new SessionController(); 

@@ -33,9 +33,9 @@ router.get('/code/:code', controllerWrapper(quizController.getQuizByCode.bind(qu
 /**
  * @route GET /api/quizzes/:id
  * @desc Lấy chi tiết một quiz theo ID
- * @access Private
+ * @access Public
  */
-router.get('/:id', requireAuth, controllerWrapper(quizController.getQuizById.bind(quizController)));
+router.get('/:id', controllerWrapper(quizController.getQuizById.bind(quizController)));
 
 /**
  * @route POST /api/quizzes

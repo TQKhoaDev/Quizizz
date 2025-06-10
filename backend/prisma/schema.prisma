@@ -101,18 +101,20 @@ model QuestionOption {
 
 // Mô hình phiên kiểm tra
 model QuizSession {
-  id              String        @id @default(uuid())
-  status          SessionStatus @default(PENDING)
-  startTime       DateTime?
-  endTime         DateTime?
-  code            String        @unique // Mã phòng
-  quizId          String
-  quiz            Quiz          @relation(fields: [quizId], references: [id])
-  proctorId       String
-  proctor         User          @relation("ProctorSessions", fields: [proctorId], references: [id])
-  participants    Participant[]
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id                  String        @id @default(uuid())
+  status              SessionStatus @default(PENDING)
+  startTime           DateTime?
+  endTime             DateTime?
+  currentQuestionIndex Int          @default(0)
+  questionStartTime   DateTime?
+  code                String        @unique // Mã phòng
+  quizId              String
+  quiz                Quiz          @relation(fields: [quizId], references: [id])
+  proctorId           String
+  proctor             User          @relation("ProctorSessions", fields: [proctorId], references: [id])
+  participants        Participant[]
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
 
   @@map("quiz_sessions")
 }
@@ -120,6 +122,7 @@ model QuizSession {
 enum SessionStatus {
   PENDING
   ACTIVE
+  WAITING_NEXT_QUESTION
   COMPLETED
   CANCELLED
 }

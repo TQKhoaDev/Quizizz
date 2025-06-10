@@ -53,14 +53,9 @@ Quizizz Clone là nền tảng giáo dục trực tuyến hiện đại cho phé
 1. **Thi trắc nghiệm (ưu tiên hiện tại)**:
    - Hệ thống chấm điểm tự động
    - Đa dạng loại câu hỏi trắc nghiệm
-   - Hỗ trợ hình ảnh và video trong câu hỏi
    - Tạo ngân hàng câu hỏi
-
-2. **Mở rộng sang thi tự luận (tương lai)**:
-   - Hỗ trợ câu hỏi tự luận với trình soạn thảo rich-text
-   - Công cụ đánh giá tự luận cho giáo viên
-   - Tính năng AI hỗ trợ chấm điểm
-   - So sánh bài làm để phát hiện đạo văn
+   - chịu tải cao, websocket, redis
+   - CI CD docker deloy
 
 ## Giai đoạn phát triển
 ### Giai đoạn 1: Nền tảng cơ bản (Sprint 1-2)

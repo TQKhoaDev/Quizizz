@@ -40,10 +40,8 @@ class AnswerService {
       // Kiểm tra người tham gia
       const participant = await prisma.participant.findUnique({
         where: {
-          userId_sessionId: {
-            userId: participantId,
-            sessionId
-          }
+          id: participantId,  
+          sessionId: sessionId
         }
       });
       console.log('participant', participant);
