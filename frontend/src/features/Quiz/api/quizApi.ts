@@ -107,6 +107,7 @@ export interface Question {
  * Tham gia quiz
  */
 export interface JoinQuizResponse {
+  token: string;
   session: {
     id: string;
     code: string;

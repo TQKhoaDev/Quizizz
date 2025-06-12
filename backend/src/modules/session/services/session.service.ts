@@ -228,20 +228,12 @@ class SessionService {
   /**
    * Lấy thông tin chi tiết phiên quiz
    * @param sessionId ID của phiên quiz
-   * @param proctorId ID của người giám sát (để kiểm tra quyền)
    * @returns Thông tin chi tiết phiên quiz
    */
-  async getSessionById(sessionId: string, proctorId?: string) {
+  async getSessionById(sessionId: string) {
     try {
-      const whereCondition: any = { id: sessionId };
-      
-      // Nếu có proctorId, kiểm tra quyền
-      if (proctorId) {
-        whereCondition.proctorId = proctorId;
-      }
-      
       const session = await prisma.quizSession.findFirst({
-        where: whereCondition,
+        where: { id: sessionId },
         include: {
           quiz: {
             include: {
@@ -266,13 +258,13 @@ class SessionService {
           }
         }
       });
-      
+  
       if (!session) {
-        throw new AppError('Phiên quiz không tồn tại hoặc bạn không có quyền', 404);
+        throw new AppError('Phiên quiz không tồn tại', 404);
       }
       
       return session;
-    } catch (error: unknown) {
+      } catch (error: unknown) {
       if (error instanceof AppError) throw error;
       const errorMessage = error instanceof Error ? error.message : 'Lỗi không xác định';
       throw new AppError(`Lỗi khi lấy thông tin phiên quiz: ${errorMessage}`, 500);

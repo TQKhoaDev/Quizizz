@@ -185,24 +185,17 @@ class QuizController {
   async joinQuiz(req: AuthRequest, res: Response) {
     try {
       const { code, displayName } = req.body;
-      
-      // Lấy userId nếu người dùng đã đăng nhập
       const userId = req.user?.id;
-      
-      // Nếu người dùng không đăng nhập, yêu cầu displayName
-      if (!userId && !displayName) {
-        return res.status(400).json({
-          success: false,
-          message: 'Bạn cần cung cấp tên hiển thị để tham gia'
-        });
-      }
       
       const result = await quizService.joinQuiz(code, userId, displayName);
       
       res.status(200).json({
         success: true,
         message: 'Tham gia phòng quiz thành công',
-        data: result
+        data: {
+          ...result,
+          token: result.token
+        }
       });
     } catch (error: any) {
       res.status(error.statusCode || 500).json({

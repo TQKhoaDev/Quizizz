@@ -39,9 +39,8 @@ class SessionController {
    */
   async getSessionById(req: Request, res: Response) {
     const { sessionId } = req.params;
-    const userId = req.user!.id;
     
-    const session = await sessionService.getSessionById(sessionId, userId);
+    const session = await sessionService.getSessionById(sessionId);
     
     res.status(200).json({
       success: true,

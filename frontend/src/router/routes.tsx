@@ -51,6 +51,7 @@ const router = createBrowserRouter([
         path: "quiz/waiting/:sessionId",
         element: <WaitingRoom />,
       },
+
       {
         path: "*",
         element: <NotFound />,

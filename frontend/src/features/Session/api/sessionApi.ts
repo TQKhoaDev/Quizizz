@@ -235,5 +235,29 @@ export const sessionApi = {
             throw new Error(`Không tìm thấy phiên có ID ${id}`);
         }
     },
-};
 
+    joinQuiz: async (code: string, displayName?: string) => {
+        try {
+            const response = await axios.post(`${API_URL}/quizzes/join`, { 
+                code, 
+                displayName 
+            });
+            
+            // Lấy token từ response
+            const { token } = response.data.data;
+            
+            if (token) {
+                // Lưu token vào localStorage
+                localStorage.setItem('token', token);
+                console.log('✅ Đã lưu token:', token);
+            } else {
+                console.warn('⚠️ Không nhận được token từ server');
+            }
+            
+            return response.data;
+        } catch (error) {
+            console.error('❌ Lỗi khi tham gia phòng quiz:', error);
+            throw error;
+        }
+    },
+};

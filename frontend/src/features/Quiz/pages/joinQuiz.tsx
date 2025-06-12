@@ -129,6 +129,12 @@ export default function QuizPage() {
       const sessionCodeFromResponse = response.session.code;
       const quizIdFromResponse = response.quiz.id;
       
+      // Lưu token vào localStorage
+      if (response.token) {
+        localStorage.setItem('token', response.token);
+        console.log("Lưu token:", response.token);
+      }
+
       // Lưu participantId vào localStorage để sử dụng sau này
       if (response.participant && response.participant.id) {
         console.log("Lưu participantId:", response.participant.id);

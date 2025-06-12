@@ -2,6 +2,7 @@ import { AppError } from '../../../middlewares/error.middleware';
 import { prisma } from '../../../services/prisma.service';
 import { CreateQuizDto } from '../dtos/create-quiz.dto';
 import { UpdateQuizDto } from '../dtos/update-quiz.dto';
+import jwt from 'jsonwebtoken';
 
 /**
  * Tạo mã code ngẫu nhiên cho quiz
@@ -93,6 +94,7 @@ class QuizService {
         }
 
         let user;
+        let token;
 
         // Nếu có userId, kiểm tra user hiện tại
         if (userId) {
@@ -103,6 +105,17 @@ class QuizService {
           if (!user) {
             throw new AppError('Không tìm thấy thông tin người dùng', 404);
           }
+          
+          // Tạo token cho user đã đăng nhập
+          token = jwt.sign(
+            { 
+              id: user.id, 
+              role: user.role,
+              isGuest: false 
+            },
+            process.env.JWT_SECRET || 'your-secret-key',
+            { expiresIn: '24h' }
+          );
         } 
         // Nếu không có userId nhưng có displayName, tạo user khách
         else if (displayName) {
@@ -114,6 +127,17 @@ class QuizService {
               role: 'STUDENT'
             }
           });
+
+          // Tạo token cho user khách
+          token = jwt.sign(
+            { 
+              id: user.id, 
+              role: user.role,
+              isGuest: true 
+            },
+            process.env.JWT_SECRET || 'your-secret-key',
+            { expiresIn: '24h' }
+          );
         } else {
           throw new AppError('Vui lòng cung cấp tên hiển thị để tham gia', 400);
         }
@@ -132,7 +156,8 @@ class QuizService {
           return {
             session,
             quiz: session.quiz,
-            participant: existingParticipant
+            participant: existingParticipant,
+            token
           };
         }
 
@@ -149,7 +174,8 @@ class QuizService {
         return {
           session,
           quiz: session.quiz,
-          participant
+          participant,
+          token
         };
       } catch (error) {
         if (error instanceof AppError) {

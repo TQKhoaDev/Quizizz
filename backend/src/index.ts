@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import path from 'path';
 import http from 'http';
+import { socketService } from './socket';
 
 // Import routes
 import apiRoutes from './routes';
@@ -45,9 +46,9 @@ app.use('/api', apiRoutes);
 httpServer.listen(port, async () => {
   console.log(`⚡️ Server đang chạy trên cổng ${port}`);
 
-  // Khởi tạo Socket.io server (nếu cần)
-  // socketService.initialize(httpServer);
-  // console.log('✅ Socket.io server đã được khởi tạo');
+  // Khởi tạo Socket.io server
+  socketService.initialize(httpServer);
+  console.log('✅ Socket.io server đã được khởi tạo');
 
   // Kiểm tra kết nối cơ sở dữ liệu
   try {

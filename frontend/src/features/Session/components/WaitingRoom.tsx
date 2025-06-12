@@ -4,25 +4,62 @@ import { useParams } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { sessionApi } from '../api/sessionApi';
 import type { Session, Participant } from '../api/sessionApi';
+import { useSocket } from '@/hooks';
+
+
 
 const WaitingRoom: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
   console.log("sessionId param", sessionId);
-  const [participants, setParticipants] = useState<Participant[]>([]);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const { 
+    isConnected, 
+    error: socketError, 
+    participants: socketParticipants,
+    markReady,
+    markNotReady,
+    startSession,
+    endSession,
+  } = useSocket({
+    sessionId: sessionId || '',
+    role: 'STUDENT',
+    token: localStorage.getItem('token') || ''
+  });
+
+  // Thêm log để debug
+  useEffect(() => {
+    console.log('Socket state:', { isConnected, socketError, socketParticipants });
+  }, [isConnected, socketError, socketParticipants]);
 
   // Lấy danh sách người tham gia
   useEffect(() => {
     console.log("session", session);
     if (session?.participants && Array.isArray(session.participants)) {
       console.log("Người tham gia:", session.participants);
-      setParticipants(session.participants);
+      setSession(session);
     } else {
       console.log("Không có danh sách người tham gia hoặc không phải mảng");
     }
   }, [session]);
+
+  // Hiển thị trạng thái kết nối
+  useEffect(() => {
+    if (!isConnected) {
+      setError('Mất kết nối với máy chủ');
+    } else {
+      setError(null);
+    }
+  }, [isConnected]);
+
+  // Hiển thị lỗi socket
+  useEffect(() => {
+    if (socketError) {
+      setError(socketError);
+    }
+  }, [socketError]);
 
   const fetchSession = useCallback(async () => {
     if (!sessionId) return;
@@ -124,6 +161,8 @@ const WaitingRoom: React.FC = () => {
     const randomIndex = Math.floor(Math.random() * animals.length);
     return animals[randomIndex];
   };
+
+
 
   // Nếu không có session, hiển thị trạng thái loading đẹp mắt
   if (isLoading || !session) {
@@ -258,6 +297,15 @@ const WaitingRoom: React.FC = () => {
           </motion.div>
         </div>
 
+        {/* Hiển thị trạng thái kết nối */}
+        <div className="text-center mb-4">
+          <span className={`inline-block px-3 py-1 rounded-full text-sm ${
+            isConnected ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          }`}>
+            {isConnected ? '✅ Đã kết nối' : '❌ Mất kết nối'}
+          </span>
+        </div>
+
         {/* Danh sách người tham gia */}
         <motion.div
           variants={containerVariants}
@@ -265,8 +313,8 @@ const WaitingRoom: React.FC = () => {
           animate="visible"
           className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-8"
         >
-          {participants && participants.length > 0 ? (
-            participants.map((participant, index) => (
+          {session?.participants && session.participants.length > 0 ? (
+            session.participants.map((participant: Participant, index: number) => (
               <motion.div
                 key={participant.id || index}
                 variants={avatarVariants}
@@ -295,11 +343,11 @@ const WaitingRoom: React.FC = () => {
                   </motion.div>
                 </div>
                 <p className="text-sm font-medium text-gray-700 text-center max-w-[100px] truncate">
-                  {participant.user.fullName || "Người tham gia"}
+                  {participant.user?.fullName || "Người tham gia"}
                 </p>
-                {/* {participant.user.isGuest && (
+                {participant.user?.isGuest && (
                   <span className="text-xs text-purple-600 px-2 py-0.5 bg-purple-100 rounded-full">Khách</span>
-                )} */}
+                )}
               </motion.div>
             ))
           ) : (
@@ -345,9 +393,18 @@ const WaitingRoom: React.FC = () => {
             >
               ⏳
             </motion.span>
-            <span className="font-medium">({participants.length} người)</span>
+            <span className="font-medium">({session.participants?.length} người)</span>
           </p>
         </motion.div>
+
+        {/* Nút điều khiển */}
+        <div>
+          <button onClick={markReady}>Sẵn sàng</button>
+          <button onClick={markNotReady}>Chưa sẵn sàng</button>
+          <button onClick={startSession}>Bắt đầu phiên</button>
+          <button onClick={endSession}>Kết thúc phiên</button>
+
+        </div>
       </Card>
     </div>
   );

@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { sessionApi } from '../api/sessionApi';
 import type { Session } from '../api/sessionApi';
 import { Play, Square, Users, Clock, Award } from 'lucide-react';
+import { useSocket } from '@/hooks';
 
 const SessionControl: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -14,7 +15,12 @@ const SessionControl: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
+  const { isConnected, testMessage } = useSocket({
+    sessionId: sessionId || '',
+    role: 'ADMIN',
+    token: localStorage.getItem('token') || '',
 
+  });
   useEffect(() => {
     const fetchSession = async () => {
       if (!sessionId) return;
@@ -33,9 +39,6 @@ const SessionControl: React.FC = () => {
     };
 
     fetchSession();
-    // Cập nhật dữ liệu mỗi 5 giây
-    const interval = setInterval(fetchSession, 5000);
-    return () => clearInterval(interval);
   }, [sessionId]);
 
   const handleStartSession = async () => {
@@ -137,8 +140,17 @@ const SessionControl: React.FC = () => {
     );
   }
 
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-100 via-pink-100 to-blue-100 p-4 md:p-8">
+       <div>
+      <h2>Test Socket Connection</h2>
+      <div>Trạng thái: {isConnected ? '✅ Đã kết nối' : '❌ Chưa kết nối'}</div>
+      {error && <div style={{ color: 'red' }}>Lỗi: {error}</div>}
+      {testMessage && <div>Tin nhắn test: {testMessage}</div>}
+      
+
+    </div>
       <Card className="max-w-4xl mx-auto p-6 md:p-8 bg-white/80 backdrop-blur-lg rounded-2xl shadow-xl">
         {/* Header */}
         <div className="text-center mb-8">
@@ -219,15 +231,15 @@ const SessionControl: React.FC = () => {
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
                     <span className="text-xl">
-                      {participant.user.fullName.charAt(0).toUpperCase()}
+                      {(participant.user?.fullName || '?').charAt(0).toUpperCase()}
                     </span>
                   </div>
                   <div>
                     <p className="font-medium text-gray-800">
-                      {participant.user.fullName}
+                      {participant.user?.fullName || 'Người dùng ẩn danh'}
                     </p>
                     <p className="text-sm text-gray-500">
-                      {participant.user.isGuest ? 'Khách' : 'Thành viên'}
+                      {participant.user?.isGuest ? 'Khách' : 'Thành viên'}
                     </p>
                   </div>
                 </div>
