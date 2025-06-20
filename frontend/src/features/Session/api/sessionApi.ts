@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { SessionStatus } from '../types';
 
 // Cấu hình base URL cho API
 const API_URL = import.meta.env.VITE_API_BACKEND || 'http://localhost:3001/api';
@@ -19,7 +20,7 @@ export interface Participant {
 
 export interface Session {
     id: string;
-    status: 'PENDING' | 'ACTIVE' | 'ENDED' | 'CANCELED';
+    status: SessionStatus;
     startTime: string;
     endTime: string | null;
     proctorId: string;

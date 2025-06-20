@@ -12,7 +12,6 @@ import {
   User,
   Shield,
   Clock,
-  Wifi,
   WifiOff,
   Eye,
   EyeOff,

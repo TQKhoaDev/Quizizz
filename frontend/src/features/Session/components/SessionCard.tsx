@@ -10,6 +10,7 @@ interface SessionCardProps {
   onStart?: (id: string) => void;
   onEnd?: (id: string) => void;
   onCancel?: (id: string) => void;
+  onView?: () => void;
 }
 
 /**

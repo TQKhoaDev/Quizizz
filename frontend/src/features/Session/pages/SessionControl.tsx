@@ -31,81 +31,15 @@ import {
 } from 'lucide-react';
 import { quizApi } from '../../Quiz/api/quizApi';
 import SessionStatusDashboard from '../components/SessionStatusDashboard';
-
-// Interface cho người tham gia hiển thị
-interface DisplayParticipant {
-  id: string;
-  userId: string;
-  fullName: string;
-  role: 'PROCTOR' | 'STUDENT' | 'ADMIN';
-  isGuest: boolean;
-  ready: boolean;
-  joinTime: string;
-  isOnline: boolean;
-  lastActivity?: string;
-}
-
-// Interface cho thống kê realtime
-interface SessionStats {
-  totalParticipants: number;
-  readyParticipants: number;
-  onlineParticipants: number;
-  readyPercentage: number;
-}
-
-// Interface cho câu hỏi quiz
-interface QuizQuestion {
-  id: string;
-  content: string;
-  order: number;
-  timeLimit: number;
-  points: number;
-  difficulty: 'EASY' | 'MEDIUM' | 'HARD';
-  options: Array<{
-    id: string;
-    content: string;
-    order: number;
-    isCorrect: boolean;
-  }>;
-}
-
-// Interface cho trạng thái quiz realtime
-interface QuizRealTimeState {
-  currentQuestionIndex: number;
-  currentQuestion: QuizQuestion | null;
-  timeLeft: number;
-  isQuestionActive: boolean;
-  answerStats: Record<string, number>;
-  participantAnswers: Record<string, string>;
-}
-
-// Thêm interface cho session realtime status
-interface SessionRealtimeStatus {
-  status: 'PENDING' | 'ACTIVE' | 'WAITING_NEXT_QUESTION' | 'ENDED' | 'COMPLETED' | 'CANCELED';
-  lastUpdated: string;
-  participantCount: number;
-  activeParticipants: number;
-  currentActivity: string;
-  uptime: number; // thời gian session đã chạy (giây)
-}
-
-// Thêm interface cho socket session status update
-interface SessionStatusUpdateData {
-  status?: 'PENDING' | 'ACTIVE' | 'WAITING_NEXT_QUESTION' | 'ENDED' | 'COMPLETED' | 'CANCELED';
-  currentActivity?: string;
-  participantCount?: number;
-  activeParticipants?: number;
-  timestamp: string;
-}
-
-// Thêm interface cho participant events
-interface ParticipantEventData {
-  userId: string;
-  fullName: string;
-  role: string;
-  timestamp: string;
-  remainingParticipants?: number;
-}
+import type {
+  SessionRealtimeStatus,
+  SessionStatusUpdateData,
+  ParticipantEventData,
+  DisplayParticipant,
+  SessionStats,
+  QuizQuestion,
+  QuizRealTimeState
+} from '../types';
 
 const SessionControl: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -675,7 +609,7 @@ const SessionControl: React.FC = () => {
       currentActivity: newActivity,
       uptime: sessionStartTime ? Math.floor((Date.now() - sessionStartTime) / 1000) : 0
     }));
-  }, [session, participants, quizState.isQuestionActive, quizState.currentQuestionIndex, quizQuestions.length, sessionStartTime]);
+  }, [session, participants, quizState.isQuestionActive, quizState.currentQuestionIndex, quizQuestions.length, sessionStartTime, setRealtimeStatus]);
 
   // Effect để theo dõi thời gian uptime
   useEffect(() => {
@@ -693,7 +627,7 @@ const SessionControl: React.FC = () => {
       
       return () => clearInterval(interval);
     }
-  }, [session?.status, sessionStartTime]);
+  }, [session, session?.status, sessionStartTime, setRealtimeStatus]);
 
   // Lắng nghe socket events cho realtime updates với session dependency
   useEffect(() => {
@@ -763,6 +697,7 @@ const SessionControl: React.FC = () => {
       case 'COMPLETED':
         return 'Phiên đã kết thúc';
       case 'CANCELED':
+      case 'CANCELLED':
         return 'Phiên đã bị hủy';
       default:
         return `Trạng thái: ${status}`;
@@ -1002,14 +937,26 @@ const SessionControl: React.FC = () => {
                   <Badge variant={
                     session.status === 'PENDING' ? 'secondary' :
                     session.status === 'ACTIVE' ? 'default' :
-                    (session.status === 'ENDED' || session.status === 'COMPLETED') ? 'outline' : 'destructive'
+                    session.status === 'ENDED' || session.status === 'COMPLETED' ? 'outline' : 'destructive'
                   }>
-                    {session.status === 'PENDING' ? 'Chờ bắt đầu' : 
-                     session.status === 'ACTIVE' ? 'Đang diễn ra' : 
-                     session.status === 'WAITING_NEXT_QUESTION' ? 'Chờ câu hỏi tiếp theo' :
-                     (session.status === 'ENDED' || session.status === 'COMPLETED') ? 'Đã kết thúc' : 
-                     (session.status === 'CANCELED' || session.status === 'CANCELLED') ? 'Đã hủy' : 
-                     `Trạng thái: ${session.status}`}
+                    {(() => {
+                      switch (session.status) {
+                        case 'PENDING':
+                          return 'Chờ bắt đầu';
+                        case 'ACTIVE':
+                          return 'Đang diễn ra';
+                        case 'WAITING_NEXT_QUESTION':
+                          return 'Chờ câu hỏi tiếp theo';
+                        case 'ENDED':
+                        case 'COMPLETED':
+                          return 'Đã kết thúc';
+                        case 'CANCELED':
+                        case 'CANCELLED':
+                          return 'Đã hủy';
+                        default:
+                          return `Trạng thái: ${session.status}`;
+                      }
+                    })()}
                   </Badge>
                 </div>
                 

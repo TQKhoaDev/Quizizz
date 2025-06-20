@@ -278,7 +278,7 @@ const QuizControlPanel: React.FC<QuizControlPanelProps> = ({
               Phân bố lựa chọn:
             </p>
             <div className="space-y-2">
-              {realTimeStats.optionStats.map((stat, index) => (
+              {realTimeStats.optionStats.map((stat: { optionId: string; count: number }, index: number) => (
                 <div key={stat.optionId} className="flex items-center gap-2">
                   <span className="text-sm font-medium w-6">
                     {String.fromCharCode(65 + index)}

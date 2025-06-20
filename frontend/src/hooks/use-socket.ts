@@ -20,11 +20,54 @@ interface TestMessageData {
   timestamp?: string;
 }
 
+// Định nghĩa interface cho question
+interface QuestionData {
+  id: string;
+  content: string;
+  order: number;
+  timeLimit: number;
+  points: number;
+  difficulty: 'EASY' | 'MEDIUM' | 'HARD';
+  options: Array<{
+    id: string;
+    content: string;
+    order: number;
+    isCorrect: boolean;
+  }>;
+}
+
+// Định nghĩa interface cho participant
+interface ParticipantData {
+  userId: string;
+  fullName: string;
+  role: 'PROCTOR' | 'STUDENT' | 'ADMIN';
+  isGuest: boolean;
+  ready: boolean;
+  timestamp: string;
+}
+
+// Thêm interface cho question events
+interface QuestionStartData {
+  questionId: string;
+  questionIndex: number;
+  timeLimit: number;
+  question: QuestionData;
+}
+
+interface QuestionEndData {
+  questionId: string;
+  results: {
+    totalAnswers: number;
+    correctAnswers: number;
+    optionStats: Record<string, number>;
+  };
+}
+
 export const useSocket = ({ sessionId, role, token, autoConnect = true }: UseSocketOptions) => {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [testMessage, setTestMessage] = useState<string>('');
-  const [participants, setParticipants] = useState<any[]>([]);
+  const [participants, setParticipants] = useState<ParticipantData[]>([]);
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
@@ -86,31 +129,48 @@ export const useSocket = ({ sessionId, role, token, autoConnect = true }: UseSoc
     });
 
     // Thêm các event listener mới
-    socket.on('participant-joined', (data) => {
+    socket.on('participant-joined', (data: ParticipantData) => {
       console.log('👥 Người tham gia mới:', data);
       setParticipants(prev => [...prev, data]);
     });
 
-    socket.on('participant-left', (data) => {
+    socket.on('participant-left', (data: ParticipantData) => {
       console.log('❌ Người tham gia rời đi:', data);
       setParticipants(prev => prev.filter(p => p.userId !== data.userId));
     });
 
-    socket.on('participant-ready', (data) => {
+    socket.on('participant-ready', (data: ParticipantData) => {
       console.log('✅ Người tham gia sẵn sàng:', data);
       setParticipants(prev => 
         prev.map(p => p.userId === data.userId ? {...p, ready: true} : p)
       );
     });
 
-    socket.on('session-started', (data) => {
+    socket.on('session-started', (data: { sessionId: string; timestamp: string }) => {
       console.log('🚀 Phiên bắt đầu:', data);
       // Xử lý khi phiên bắt đầu
     });
 
-    socket.on('session-ended', (data) => {
+    socket.on('session-ended', (data: { sessionId: string; timestamp: string }) => {
       console.log('🏁 Phiên kết thúc:', data);
       // Xử lý khi phiên kết thúc
+    });
+
+    // Thêm các event listeners cho question control
+    socket.on('question-started', (data: QuestionStartData) => {
+      console.log('📝 Câu hỏi bắt đầu:', data);
+    });
+
+    socket.on('question-ended', (data: QuestionEndData) => {
+      console.log('✅ Câu hỏi kết thúc:', data);
+    });
+
+    socket.on('answer-submitted', (data: { userId: string; questionId: string; answer: string }) => {
+      console.log('📝 Có câu trả lời mới:', data);
+    });
+
+    socket.on('pong', () => {
+      // Xử lý phản hồi ping - không log để tránh spam
     });
 
     // Kết nối socket nếu autoConnect là true
@@ -124,7 +184,6 @@ export const useSocket = ({ sessionId, role, token, autoConnect = true }: UseSoc
       }
     };
   }, [sessionId, role, token, autoConnect]);
-
 
   // Thêm các hàm mới
   const markReady = () => {
@@ -143,6 +202,30 @@ export const useSocket = ({ sessionId, role, token, autoConnect = true }: UseSoc
     socketRef.current?.emit('end-session');
   };
 
+  // Bổ sung các methods thiếu
+  const startQuestion = (data: QuestionStartData) => {
+    console.log('📤 Starting question:', data);
+    socketRef.current?.emit('start-question', {
+      sessionId,
+      ...data
+    });
+  };
+
+  const endQuestion = (data: QuestionEndData) => {
+    console.log('📤 Ending question:', data);
+    socketRef.current?.emit('end-question', {
+      sessionId,
+      ...data
+    });
+  };
+
+  const sendPing = () => {
+    socketRef.current?.emit('ping', {
+      sessionId,
+      timestamp: new Date().toISOString()
+    });
+  };
+
   return {
     socket: socketRef.current,
     isConnected,
@@ -152,6 +235,9 @@ export const useSocket = ({ sessionId, role, token, autoConnect = true }: UseSoc
     markReady,
     markNotReady,
     startSession,
-    endSession
+    endSession,
+    startQuestion,
+    endQuestion,
+    sendPing
   };
 };

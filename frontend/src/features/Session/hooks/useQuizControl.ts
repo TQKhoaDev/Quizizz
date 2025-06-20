@@ -1,10 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import axios from 'axios';
-import type { 
-  QuizControlState,
-  QuizRealTimeState,
-  SessionStatus
-} from '../types/sessionControl';
 
 // Interface definitions trực tiếp trong file
 interface QuizQuestion {
@@ -164,7 +159,7 @@ export const useQuizControl = (
     } catch (error) {
       console.error('❌ [QUIZ CONTROL] Error loading quiz questions:', error);
     }
-  }, [session?.quiz?.id]);
+  }, [session?.quiz?.id, apiClient]);
 
   // =========================
   // AUDIO UTILITIES
@@ -176,7 +171,7 @@ export const useQuizControl = (
   const playWarningSound = useCallback(() => {
     try {
       if (!audioContextRef.current) {
-        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
         audioContextRef.current = new AudioContextClass();
       }
       

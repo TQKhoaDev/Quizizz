@@ -1,5 +1,5 @@
 import type { Session } from "../api/sessionApi"
-import { SessionCard } from "./SessionCard"
+import { SessionCard } from "./SessionCard";
 
 interface SessionListProps {
   sessions: Session[];
