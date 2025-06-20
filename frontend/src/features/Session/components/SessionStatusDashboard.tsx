@@ -13,7 +13,7 @@ import {
   Timer,
   TrendingUp
 } from 'lucide-react';
-import type { SessionRealtimeStatus } from '../types';
+import type { SessionRealtimeStatus } from '../types/sessionControl';
 
 interface SessionStatusDashboardProps {
   realtimeStatus: SessionRealtimeStatus;

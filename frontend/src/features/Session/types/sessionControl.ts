@@ -41,10 +41,7 @@ export interface QuizControlState {
 export interface QuizRealtimeStats {
   totalAnswers: number;
   correctAnswers: number;
-  optionStats: Array<{
-    optionId: string;
-    count: number;
-  }>;
+  optionStats: Record<string, number>;
 }
 
 // Enum cho loại người dùng trong session
@@ -75,4 +72,17 @@ export interface SessionStats {
   highestScore?: number;
   lowestScore?: number;
   completionRate?: number;
+}
+
+// Session status type
+export type SessionStatus = 'PENDING' | 'ACTIVE' | 'WAITING_NEXT_QUESTION' | 'ENDED' | 'COMPLETED' | 'CANCELED';
+
+// Interface cho session realtime status
+export interface SessionRealtimeStatus {
+  status: SessionStatus;
+  lastUpdated: string;
+  participantCount: number;
+  activeParticipants: number;
+  currentActivity: string;
+  uptime: number; // thời gian session đã chạy (giây)
 }

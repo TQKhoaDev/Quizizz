@@ -1,5 +1,4 @@
 import axios from 'axios';
-import type { SessionStatus } from '../types';
 
 // Cấu hình base URL cho API
 const API_URL = import.meta.env.VITE_API_BACKEND || 'http://localhost:3001/api';
@@ -20,7 +19,7 @@ export interface Participant {
 
 export interface Session {
     id: string;
-    status: SessionStatus;
+    status: 'PENDING' | 'ACTIVE' | 'ENDED' | 'CANCELED';
     startTime: string;
     endTime: string | null;
     proctorId: string;
@@ -46,6 +45,26 @@ export interface CreateSessionRequest {
 
 // Dữ liệu mẫu cho testing
 const mockSessions: Session[] = [
+    {
+        id: 'd15d6cae-722e-465d-9b4e-e5bc35b19332',
+        status: 'ACTIVE',
+        startTime: new Date().toISOString(),
+        endTime: null,
+        proctorId: '1',
+        quizId: '1',
+        quiz: {
+            id: '1',
+            title: 'Kiểm tra Demo Session',
+            description: 'Session demo để test ứng dụng',
+            totalParticipants: 20,
+        },
+        _count: {
+            participants: 5,
+        },
+        code: 'DEMO123',
+        createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+        updatedAt: new Date().toISOString(),
+    },
     {
         id: '1',
         status: 'ACTIVE',

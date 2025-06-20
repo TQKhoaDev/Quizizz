@@ -16,11 +16,13 @@ interface SessionCardProps {
 /**
  * Component hiển thị thông tin chi tiết của một phiên học
  */
-export const SessionCard = ({ session, onStart, onEnd, onCancel }: SessionCardProps) => {
+export const SessionCard = ({ session, onStart, onEnd, onCancel, onView }: SessionCardProps) => {
   const navigate = useNavigate();
 
   const handleView = () => {
-    navigate(`/dashboard/sessions/${session.id}/control`);
+    if (onView) {
+      navigate(`/dashboard/sessions/${session.id}/control`);
+    }
   };
 
   // Hàm định dạng trạng thái session

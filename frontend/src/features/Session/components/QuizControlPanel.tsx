@@ -272,14 +272,14 @@ const QuizControlPanel: React.FC<QuizControlPanelProps> = ({
         </div>
 
         {/* Thống kê theo option */}
-        {realTimeStats.optionStats && realTimeStats.optionStats.length > 0 && (
+        {realTimeStats.optionStats && Object.keys(realTimeStats.optionStats).length > 0 && (
           <div className="mt-4">
             <p className="text-sm font-medium text-gray-700 mb-2">
               Phân bố lựa chọn:
             </p>
             <div className="space-y-2">
-              {realTimeStats.optionStats.map((stat: { optionId: string; count: number }, index: number) => (
-                <div key={stat.optionId} className="flex items-center gap-2">
+              {Object.entries(realTimeStats.optionStats).map(([optionId, count], index) => (
+                <div key={optionId} className="flex items-center gap-2">
                   <span className="text-sm font-medium w-6">
                     {String.fromCharCode(65 + index)}
                   </span>
@@ -290,7 +290,7 @@ const QuizControlPanel: React.FC<QuizControlPanelProps> = ({
                         initial={{ width: 0 }}
                         animate={{ 
                           width: realTimeStats.totalAnswers > 0 
-                            ? `${(stat.count / realTimeStats.totalAnswers) * 100}%` 
+                            ? `${(count / realTimeStats.totalAnswers) * 100}%` 
                             : '0%'
                         }}
                         transition={{ duration: 0.5 }}
@@ -298,7 +298,7 @@ const QuizControlPanel: React.FC<QuizControlPanelProps> = ({
                     </div>
                   </div>
                   <span className="text-sm text-gray-600 w-8">
-                    {stat.count}
+                    {count}
                   </span>
                 </div>
               ))}

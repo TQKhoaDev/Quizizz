@@ -11,13 +11,13 @@ import Dashboard from "@/features/dasboard";
 import Login from "@/features/Auth/pages/login";
 import Register from "@/features/Auth/pages/register";
 import QuizList from "@/features/Quiz/pages/quiz";
-import SessionPage from "@/features/session/pages/session";
-import SessionControl from "@/features/session/pages/SessionControl";
+import SessionPage from "@/features/Session/pages/session";
+import SessionControl from "@/features/Session/pages/SessionControl";
 import NotFound from "@/features/NotFound";
 import QuizPage from "@/features/Quiz/pages/joinQuiz";
 import RoomPage from "@/features/room/pages/RoomPage";
 import { ResultPage } from "@/features/participant";
-import WaitingRoom from "@/features/session/components/WaitingRoom";
+import WaitingRoom from "@/features/Session/components/WaitingRoom";
 
 // Tạo các routes cho ứng dụng
 const router = createBrowserRouter([

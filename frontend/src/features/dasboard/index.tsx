@@ -28,7 +28,7 @@ import {
 // Import các tab components
 import OverviewTab from "./components/OverviewTab"
 import QuizTab from "../Quiz/pages/quiz"
-import SessionTab from "../session/pages/session"
+import SessionTab from "../Session/pages/session"
 import AnalyticsTab from "./components/AnalyticsTab"
 
 export default function QuizizzDashboard() {

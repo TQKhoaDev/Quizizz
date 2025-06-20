@@ -1,49 +1,12 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import axios from 'axios';
+import type { 
+  QuizControlState,
+  SessionRealtimeStatus,
+  QuizRealtimeStats
+} from '../types/sessionControl';
 
 // Interface definitions trực tiếp trong file
-interface QuizQuestion {
-  id: string;
-  content: string;
-  order: number;
-  timeLimit: number;
-  points: number;
-  difficulty: 'EASY' | 'MEDIUM' | 'HARD';
-  options: Array<{
-    id: string;
-    content: string;
-    order: number;
-    isCorrect: boolean;
-  }>;
-}
-
-interface QuizRealTimeState {
-  currentQuestionIndex: number;
-  currentQuestion: QuizQuestion | null;
-  timeLeft: number;
-  isQuestionActive: boolean;
-  answerStats: Record<string, number>;
-  participantAnswers: Record<string, string>;
-}
-
-interface QuizControlState {
-  quizQuestions: QuizQuestion[];
-  quizState: QuizRealTimeState;
-  isLowTime: boolean;
-  sessionStartTime: number | null;
-  currentQuestionIndex: number;
-  currentQuestion: QuizQuestion | null;
-  timeLeft: number;
-  isQuestionActive: boolean;
-}
-
-interface SessionStatus {
-  currentActivity: string;
-  lastUpdated: string;
-  participantCount: number;
-  connectionStatus: 'connected' | 'disconnected' | 'connecting';
-}
-
 interface SessionWithQuiz {
   quiz?: {
     id: string;
@@ -54,10 +17,9 @@ interface SocketConnection {
   emit: (event: string, data: Record<string, unknown>) => void;
 }
 
-interface QuizRealtimeStats {
-  totalAnswers: number;
-  correctAnswers: number;
-  optionStats: Record<string, number>;
+// Interface cho webkit audio context
+interface WindowWithWebkitAudioContext extends Window {
+  webkitAudioContext?: typeof AudioContext;
 }
 
 /**
@@ -77,7 +39,7 @@ export const useQuizControl = (
   socket: SocketConnection | null,
   sessionId: string,
   participants: unknown[],
-  setRealtimeStatus: (updater: (prev: SessionStatus) => SessionStatus) => void
+  setRealtimeStatus: (updater: (prev: SessionRealtimeStatus) => SessionRealtimeStatus) => void
 ) => {
   // =========================
   // STATE MANAGEMENT
@@ -171,7 +133,7 @@ export const useQuizControl = (
   const playWarningSound = useCallback(() => {
     try {
       if (!audioContextRef.current) {
-        const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        const AudioContextClass = window.AudioContext || (window as WindowWithWebkitAudioContext).webkitAudioContext;
         audioContextRef.current = new AudioContextClass();
       }
       
