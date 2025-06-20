@@ -174,18 +174,22 @@ const SessionControl: React.FC = () => {
     }
   }, [isConnected, sessionId]);
 
+  // Tối ưu effect cho participants - chỉ log khi có thay đổi quan trọng
   useEffect(() => {
-    // Chỉ log thay đổi quan trọng về participants
-    if (participants.length > lastParticipantCount && lastParticipantCount > 0) {
-      console.log('🔔 New participant joined! Total:', participants.length);
-    }
+    const currentCount = participants.length;
     
-    if (participants.length < lastParticipantCount && lastParticipantCount > 0) {
-      console.log('👋 Participant left! Total:', participants.length);
+    if (currentCount !== lastParticipantCount) {
+      if (currentCount > lastParticipantCount && lastParticipantCount >= 0) {
+        console.log('🔔 [CONTROL] New participant joined! Total:', currentCount);
+      }
+      
+      if (currentCount < lastParticipantCount && lastParticipantCount > 0) {
+        console.log('👋 [CONTROL] Participant left! Total:', currentCount);
+      }
+      
+      setLastParticipantCount(currentCount);
     }
-    
-    setLastParticipantCount(participants.length);
-  }, [participants.length, lastParticipantCount]); // Chỉ theo dõi length thay vì toàn bộ array
+  }, [participants.length, lastParticipantCount]);
 
   // Load quiz questions từ API thật
   const loadQuizQuestions = useCallback(async () => {
@@ -462,7 +466,22 @@ const SessionControl: React.FC = () => {
     return () => clearInterval(timer);
   }, [quizState.isQuestionActive, quizState.timeLeft, handleNextQuestion, socket, quizQuestions, quizState.currentQuestionIndex, playWarningSound]);
 
-  // Tính toán thống kê realtime
+  // Tính toán thống kê từ socket participants thay vì manual tracking
+  const calculateStats = useCallback((): SessionStats => {
+    const total = participants.length;
+    const ready = participants.filter(p => p.ready).length;
+    const online = participants.filter(p => p.isOnline).length;
+    const readyPercentage = total > 0 ? Math.round((ready / (total-1)) * 100) : 0;
+
+    return {
+      totalParticipants: total,
+      readyParticipants: ready,
+      onlineParticipants: online,
+      readyPercentage
+    };
+  }, [participants]);
+
+  // Tính toán thống kê realtime cho quiz
   const calculateRealTimeStats = useCallback(() => {
     if (!quizQuestions.length || participants.length === 0) {
       return {
@@ -497,21 +516,6 @@ const SessionControl: React.FC = () => {
     };
   }, [quizQuestions, participants, quizState.currentQuestionIndex]);
 
-  // Tính toán thống kê từ participants
-  const calculateStats = useCallback((): SessionStats => {
-    const total = participants.length;
-    const ready = participants.filter(p => p.ready).length;
-    const online = participants.length;
-    const readyPercentage = total > 0 ? Math.round((ready / total) * 100) : 0;
-
-    return {
-      totalParticipants: total,
-      readyParticipants: ready,
-      onlineParticipants: online,
-      readyPercentage
-    };
-  }, [participants]);
-
   const stats = calculateStats();
 
   // Chuyển đổi participants từ socket thành DisplayParticipant
@@ -523,7 +527,7 @@ const SessionControl: React.FC = () => {
     isGuest: p.isGuest,
     ready: p.ready || false,
     joinTime: p.timestamp,
-    isOnline: true,
+    isOnline: p.isOnline || true,
     lastActivity: new Date().toISOString()
   }));
 
@@ -682,7 +686,7 @@ const SessionControl: React.FC = () => {
     }
   }, []);
 
-  // Effect để cập nhật realtime status
+  // Effect để cập nhật realtime status - thêm dependencies cần thiết
   useEffect(() => {
     if (!session) return;
 
@@ -698,7 +702,7 @@ const SessionControl: React.FC = () => {
       currentActivity: newActivity,
       uptime: sessionStartTime ? Math.floor((Date.now() - sessionStartTime) / 1000) : 0
     }));
-  }, [session, participants, quizState.isQuestionActive, quizState.currentQuestionIndex, quizQuestions.length, sessionStartTime, setRealtimeStatus, getActivityDescription]);
+  }, [session, participants, quizState.isQuestionActive, quizState.currentQuestionIndex, quizQuestions.length, sessionStartTime, getActivityDescription]);
 
   // Effect để theo dõi thời gian uptime
   useEffect(() => {
@@ -718,7 +722,7 @@ const SessionControl: React.FC = () => {
     }
   }, [session?.status, sessionStartTime, setRealtimeStatus]);
 
-  // Lắng nghe socket events cho realtime updates với session dependency
+  // Lắng nghe socket events cho realtime updates - thêm dependencies cần thiết
   useEffect(() => {
     if (!socket) return;
 
@@ -738,10 +742,11 @@ const SessionControl: React.FC = () => {
 
     const handleParticipantJoined = (data: ParticipantEventData) => {
       console.log('👋 [CONTROL] Participant joined:', data);
+      // Cập nhật realtime status với data mới từ socket participants
       setRealtimeStatus(prev => ({
         ...prev,
-        participantCount: prev.participantCount + 1,
-        activeParticipants: prev.activeParticipants + 1,
+        participantCount: participants.length,
+        activeParticipants: participants.filter(p => p.isOnline).length,
         currentActivity: `Người tham gia mới: ${data.fullName}`,
         lastUpdated: new Date().toISOString()
       }));
@@ -749,10 +754,11 @@ const SessionControl: React.FC = () => {
 
     const handleParticipantLeft = (data: ParticipantEventData) => {
       console.log('👋 [CONTROL] Participant left:', data);
+      // Cập nhật realtime status với data từ socket participants
       setRealtimeStatus(prev => ({
         ...prev,
-        participantCount: Math.max(0, prev.participantCount - 1),
-        activeParticipants: Math.max(0, prev.activeParticipants - 1),
+        participantCount: participants.length,
+        activeParticipants: participants.filter(p => p.isOnline).length,
         currentActivity: `Người rời đi: ${data.fullName}`,
         lastUpdated: new Date().toISOString()
       }));
@@ -767,7 +773,7 @@ const SessionControl: React.FC = () => {
       socket.off('participant-joined', handleParticipantJoined);
       socket.off('participant-left', handleParticipantLeft);
     };
-  }, [socket, session]);
+  }, [socket, participants]);
 
   // Loading state
   if (isLoading) {
