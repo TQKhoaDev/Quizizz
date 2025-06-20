@@ -6,13 +6,19 @@ interface QuestionScreenProps {
   onAnswer: (optionId: string) => void;
   timeLeft: number;
   totalTime: number;
+  questionIndex?: number;
+  totalQuestions?: number;
+  isActive?: boolean;
 }
 
 const QuestionScreen: React.FC<QuestionScreenProps> = ({ 
   question, 
   onAnswer, 
   timeLeft, 
-  totalTime 
+  totalTime,
+  questionIndex,
+  totalQuestions,
+  isActive = true
 }) => {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   
@@ -20,33 +26,45 @@ const QuestionScreen: React.FC<QuestionScreenProps> = ({
   const timePercentage = (timeLeft / totalTime) * 100;
 
   const handleOptionClick = (optionId: string) => {
+    if (!isActive) return; // Không cho phép chọn khi question inactive
     setSelectedOption(optionId);
   };
 
   const handleSubmit = () => {
-    if (selectedOption) {
+    if (selectedOption && isActive) {
       onAnswer(selectedOption);
     }
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto bg-white rounded-xl shadow-md">
+    <div className={`p-6 max-w-4xl mx-auto bg-white rounded-xl shadow-md ${!isActive ? 'opacity-60' : ''}`}>
       {/* Thanh tiến trình thời gian */}
       <div className="w-full bg-gray-200 rounded-full h-2.5 mb-6">
         <div 
-          className="bg-blue-600 h-2.5 rounded-full transition-all duration-1000" 
+          className={`h-2.5 rounded-full transition-all duration-1000 ${
+            timePercentage > 30 ? 'bg-blue-600' : timePercentage > 10 ? 'bg-yellow-500' : 'bg-red-500'
+          }`}
           style={{ width: `${timePercentage}%` }}
         ></div>
       </div>
       
       <div className="flex justify-between items-center mb-6">
         <span className="text-sm font-medium text-gray-500">
-          Câu hỏi {question.order}/{question.quizId}
+          Câu hỏi {(questionIndex !== undefined ? questionIndex + 1 : question.order)}/{totalQuestions || 'N/A'}
         </span>
-        <span className="text-sm font-medium text-gray-500">
+        <span className={`text-sm font-medium ${timeLeft <= 10 ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
           {timeLeft} giây
         </span>
       </div>
+
+      {/* Trạng thái câu hỏi */}
+      {!isActive && (
+        <div className="mb-4 p-3 bg-yellow-100 border border-yellow-400 rounded-lg">
+          <p className="text-yellow-800 text-sm font-medium">
+            ⏳ Câu hỏi đã kết thúc hoặc chưa được kích hoạt
+          </p>
+        </div>
+      )}
 
       {/* Điểm và độ khó */}
       <div className="flex justify-between items-center mb-4">
@@ -106,8 +124,9 @@ const QuestionScreen: React.FC<QuestionScreenProps> = ({
               selectedOption === option.id 
                 ? 'border-blue-500 bg-blue-50' 
                 : 'border-gray-200'
-            }`}
+            } ${!isActive ? 'cursor-not-allowed' : 'hover:border-blue-300'}`}
             onClick={() => handleOptionClick(option.id)}
+            disabled={!isActive}
           >
             <div className="flex items-center">
               <span className={`w-8 h-8 flex items-center justify-center rounded-full mr-3 ${
@@ -127,14 +146,14 @@ const QuestionScreen: React.FC<QuestionScreenProps> = ({
       <div className="flex justify-end">
         <button
           className={`px-6 py-2 rounded-lg text-white font-medium ${
-            selectedOption 
+            selectedOption && isActive
               ? 'bg-blue-600 hover:bg-blue-700' 
               : 'bg-gray-400 cursor-not-allowed'
           }`}
           onClick={handleSubmit}
-          disabled={!selectedOption}
+          disabled={!selectedOption || !isActive}
         >
-          Xác nhận
+          {!isActive ? 'Đã hết thời gian' : 'Xác nhận'}
         </button>
       </div>
     </div>

@@ -28,6 +28,14 @@ class SocketService {
   private io: Server | null = null;
   // Map để track participants trong memory cho realtime updates
   private sessionParticipants = new Map<string, Map<string, ParticipantInfo>>();
+  // Map để track current question của mỗi session
+  private sessionQuestions = new Map<string, {
+    questionId: string;
+    questionIndex: number;
+    startTime: Date;
+    timeLimit: number;
+    question: any;
+  }>();
 
   initialize(httpServer: http.Server) {
     this.io = new Server(httpServer, {
@@ -296,16 +304,172 @@ class SocketService {
               // Cập nhật session status trong database
               await prisma.quizSession.update({
                 where: { id: user.sessionId },
-                data: { status: 'ACTIVE' }
+                data: { 
+                  status: 'ACTIVE',
+                  startTime: new Date()
+                }
               });
 
               quizSessionsNamespace.to(user.sessionId).emit('session-started', {
+                sessionCode: user.sessionId,
                 timestamp: new Date().toISOString()
               });
             } catch (error) {
               console.error('Lỗi khi bắt đầu session:', error);
               socket.emit('error', { message: 'Không thể bắt đầu session' });
             }
+          }
+        });
+
+        // Xử lý khi giám thị bắt đầu câu hỏi
+        socket.on('start-question', async (data: {
+          questionId: string;
+          questionIndex: number;
+          timeLimit: number;
+          question: any;
+        }) => {
+          if (user.role === 'PROCTOR') {
+            try {
+              console.log('🎯 [SOCKET] Starting question:', data);
+              
+              // Lưu thông tin câu hỏi hiện tại
+              this.sessionQuestions.set(user.sessionId, {
+                questionId: data.questionId,
+                questionIndex: data.questionIndex,
+                startTime: new Date(),
+                timeLimit: data.timeLimit,
+                question: data.question
+              });
+
+              // Cập nhật database
+              await prisma.quizSession.update({
+                where: { id: user.sessionId },
+                data: {
+                  currentQuestionIndex: data.questionIndex,
+                  questionStartTime: new Date(),
+                  status: 'ACTIVE'
+                }
+              });
+
+              // Gửi event tới tất cả participants
+              quizSessionsNamespace.to(user.sessionId).emit('question-started', {
+                questionId: data.questionId,
+                questionIndex: data.questionIndex,
+                timeLimit: data.timeLimit,
+                question: data.question,
+                startTime: new Date().toISOString()
+              });
+              
+              console.log(`✅ Question ${data.questionIndex + 1} started for session ${user.sessionId}`);
+            } catch (error) {
+              console.error('Lỗi khi bắt đầu câu hỏi:', error);
+              socket.emit('error', { message: 'Không thể bắt đầu câu hỏi' });
+            }
+          }
+        });
+
+        // Xử lý khi giám thị kết thúc câu hỏi
+        socket.on('end-question', async (data: {
+          questionId: string;
+          results?: any;
+        }) => {
+          if (user.role === 'PROCTOR') {
+            try {
+              console.log('🏁 [SOCKET] Ending question:', data);
+              
+              // Xóa thông tin câu hỏi hiện tại
+              this.sessionQuestions.delete(user.sessionId);
+
+              // Cập nhật database - chuyển sang trạng thái chờ câu hỏi tiếp theo
+              await prisma.quizSession.update({
+                where: { id: user.sessionId },
+                data: {
+                  status: 'WAITING_NEXT_QUESTION'
+                }
+              });
+
+              // Gửi event tới tất cả participants
+              quizSessionsNamespace.to(user.sessionId).emit('question-ended', {
+                questionId: data.questionId,
+                results: data.results || {
+                  totalAnswers: 0,
+                  correctAnswers: 0,
+                  optionStats: {}
+                },
+                timestamp: new Date().toISOString()
+              });
+              
+              console.log(`✅ Question ended for session ${user.sessionId}`);
+            } catch (error) {
+              console.error('Lỗi khi kết thúc câu hỏi:', error);
+              socket.emit('error', { message: 'Không thể kết thúc câu hỏi' });
+            }
+          }
+        });
+
+        // Xử lý auto next question (khi hết thời gian)
+        socket.on('auto-next-question', async () => {
+          if (user.role === 'PROCTOR') {
+            try {
+              // Logic chuyển câu hỏi tự động
+              const currentQuestion = this.sessionQuestions.get(user.sessionId);
+              if (currentQuestion) {
+                // Emit end current question
+                quizSessionsNamespace.to(user.sessionId).emit('question-ended', {
+                  questionId: currentQuestion.questionId,
+                  results: { totalAnswers: 0, correctAnswers: 0, optionStats: {} },
+                  timestamp: new Date().toISOString()
+                });
+                
+                this.sessionQuestions.delete(user.sessionId);
+              }
+            } catch (error) {
+              console.error('Lỗi khi auto next question:', error);
+            }
+          }
+        });
+
+        // Xử lý khi học sinh submit answer (realtime feedback)
+        socket.on('answer-submitted', async (data: {
+          questionId: string;
+          optionId: string;
+          responseTime: number;
+        }) => {
+          if (user.role === 'STUDENT') {
+            try {
+              console.log('📝 [SOCKET] Answer submitted:', {
+                userId: user.userId,
+                ...data
+              });
+
+              // Thông báo cho proctor về câu trả lời mới
+              socket.to(user.sessionId).emit('participant-answered', {
+                userId: user.userId,
+                fullName: sessionMap.get(user.userId)?.fullName || 'Unknown',
+                questionId: data.questionId,
+                responseTime: data.responseTime,
+                timestamp: new Date().toISOString()
+              });
+            } catch (error) {
+              console.error('Lỗi khi xử lý answer submission:', error);
+            }
+          }
+        });
+
+        // Xử lý get current question (cho late joiners)
+        socket.on('get-current-question', () => {
+          const currentQuestion = this.sessionQuestions.get(user.sessionId);
+          if (currentQuestion) {
+            const timeElapsed = Math.floor((Date.now() - currentQuestion.startTime.getTime()) / 1000);
+            const timeLeft = Math.max(0, currentQuestion.timeLimit - timeElapsed);
+            
+            socket.emit('current-question', {
+              ...currentQuestion,
+              timeLeft,
+              timeElapsed
+            });
+          } else {
+            socket.emit('current-question', null);
           }
         });
 

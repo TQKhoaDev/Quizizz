@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Cấu hình base URL cho API
-const API_URL = import.meta.env.VITE_API_BACKEND || 'http://localhost:3001/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 export interface Participant {
     id: string;
@@ -45,6 +45,26 @@ export interface CreateSessionRequest {
 
 // Dữ liệu mẫu cho testing
 const mockSessions: Session[] = [
+    {
+        id: 'b01c671a-a9b2-49cb-b50a-d9bdef51ee67',
+        status: 'PENDING',
+        startTime: new Date(Date.now() + 5 * 60 * 1000).toISOString(), // 5 phút nữa
+        endTime: null,
+        proctorId: '1',
+        quizId: '1',
+        quiz: {
+            id: '1',
+            title: 'Kiểm tra Quiz Realtime',
+            description: 'Session test cho realtime features',
+            totalParticipants: 30,
+        },
+        _count: {
+            participants: 0,
+        },
+        code: 'TEST123',
+        createdAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+        updatedAt: new Date().toISOString(),
+    },
     {
         id: 'd15d6cae-722e-465d-9b4e-e5bc35b19332',
         status: 'ACTIVE',
@@ -131,7 +151,8 @@ export const sessionApi = {
             const response = await axios.get<{ data: Session[] }>(`${API_URL}/sessions`, {
                 headers: {
                   Authorization: `Bearer ${localStorage.getItem('token')}`
-                }
+                },
+                withCredentials: true // Hỗ trợ cookies
               });
               return response.data.data;
         } catch (error) {
@@ -148,7 +169,8 @@ export const sessionApi = {
             const response = await axios.get<{ data: Session }>(`${API_URL}/sessions/${id}`, {
                 headers: {
                   Authorization: `Bearer ${localStorage.getItem('token')}`
-                }
+                },
+                withCredentials: true // Hỗ trợ cookies
               });
               console.log("response",response);
             return response.data.data;
@@ -166,7 +188,8 @@ export const sessionApi = {
             const response = await axios.post<{ data: Session }>(`${API_URL}/sessions`, data, {
                 headers: {
                   Authorization: `Bearer ${localStorage.getItem('token')}`
-                }
+                },
+                withCredentials: true // Hỗ trợ cookies
               });
               return response.data.data;
         } catch (error) {
@@ -197,13 +220,35 @@ export const sessionApi = {
     // Bắt đầu phiên
     startSession: async (id: string): Promise<Session> => {
         try {
-            const response = await axios.post(`${API_URL}/sessions/${id}/start`);
+            console.log(`🚀 [sessionApi] Starting session with ID: ${id}`);
+            console.log(`🔗 [sessionApi] API endpoint: ${API_URL}/sessions/${id}/start`);
+            
+            const response = await axios.post(`${API_URL}/sessions/${id}/start`, {}, {
+                headers: {
+                  Authorization: `Bearer ${localStorage.getItem('token')}`
+                },
+                withCredentials: true // Hỗ trợ cookies
+            });
+            
+            console.log(`✅ [sessionApi] Session started successfully:`, response.data);
             return response.data;
         } catch (error) {
-            console.error(`Lỗi khi bắt đầu phiên ${id}:`, error);
+            console.error(`❌ [sessionApi] Error starting session ${id}:`, error);
+            
+            // Log chi tiết về lỗi
+            if (axios.isAxiosError(error)) {
+                console.error(`📊 [sessionApi] Error details:`, {
+                    status: error.response?.status,
+                    statusText: error.response?.statusText,
+                    data: error.response?.data,
+                    url: error.config?.url
+                });
+            }
+            
             // Trả về phiên mẫu đã được cập nhật
             const mockSession = mockSessions.find(session => session.id === id);
             if (mockSession) {
+                console.log(`🎭 [sessionApi] Using mock session for ID: ${id}`);
                 return {
                     ...mockSession,
                     status: 'ACTIVE',
@@ -218,7 +263,12 @@ export const sessionApi = {
     // Kết thúc phiên
     endSession: async (id: string): Promise<Session> => {
         try {
-            const response = await axios.post(`${API_URL}/sessions/${id}/end`);
+            const response = await axios.post(`${API_URL}/sessions/${id}/end`, {}, {
+                headers: {
+                  Authorization: `Bearer ${localStorage.getItem('token')}`
+                },
+                withCredentials: true // Hỗ trợ cookies
+            });
             return response.data;
         } catch (error) {
             console.error(`Lỗi khi kết thúc phiên ${id}:`, error);
@@ -239,7 +289,12 @@ export const sessionApi = {
     // Hủy phiên
     cancelSession: async (id: string): Promise<Session> => {
         try {
-            const response = await axios.post(`${API_URL}/sessions/${id}/cancel`);
+            const response = await axios.post(`${API_URL}/sessions/${id}/cancel`, {}, {
+                headers: {
+                  Authorization: `Bearer ${localStorage.getItem('token')}`
+                },
+                withCredentials: true // Hỗ trợ cookies
+            });
             return response.data;
         } catch (error) {
             console.error(`Lỗi khi hủy phiên ${id}:`, error);

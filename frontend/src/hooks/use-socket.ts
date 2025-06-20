@@ -15,10 +15,7 @@ interface TestConnectionData {
   sessionId: string;
 }
 
-interface TestMessageData {
-  message: string;
-  timestamp?: string;
-}
+
 
 // Định nghĩa interface cho question
 interface QuestionData {
@@ -87,12 +84,44 @@ interface QuestionEndData {
   };
 }
 
+// Interface cho navigation state
+interface NavigationState {
+  path: string;
+  delay?: number;
+}
+
 // Interface cho connection stats
 interface ConnectionStats {
   totalParticipants: number;
   onlineParticipants: number;
   readyParticipants: number;
   lastActivity: string;
+}
+
+// Thêm interface cho session status events
+interface SessionStatusData {
+  sessionId: string;
+  status: 'PENDING' | 'ACTIVE' | 'ENDED' | 'COMPLETED' | 'CANCELED';
+  timestamp: string;
+}
+
+// Interface cho question state mới
+interface CurrentQuestionState {
+  questionId: string;
+  questionIndex: number;
+  question: QuestionData;
+  timeLeft: number;
+  startTime: string;
+  isActive: boolean;
+}
+
+// Interface cho participant answer feedback
+interface ParticipantAnsweredData {
+  userId: string;
+  fullName: string;
+  questionId: string;
+  responseTime: number;
+  timestamp: string;
 }
 
 export const useSocket = ({ sessionId, role, token, autoConnect = true }: UseSocketOptions) => {
@@ -107,6 +136,16 @@ export const useSocket = ({ sessionId, role, token, autoConnect = true }: UseSoc
     lastActivity: new Date().toISOString()
   });
   const [recentActivity, setRecentActivity] = useState<string>('');
+  
+  // Thêm state cho session status và navigation
+  const [sessionStatus, setSessionStatus] = useState<'PENDING' | 'ACTIVE' | 'ENDED' | 'COMPLETED' | 'CANCELED' | 'WAITING_NEXT_QUESTION'>('PENDING');
+  const [shouldNavigate, setShouldNavigate] = useState<NavigationState | null>(null);
+  
+  // Thêm state cho realtime question control
+  const [currentQuestion, setCurrentQuestion] = useState<CurrentQuestionState | null>(null);
+  const [questionStarted, setQuestionStarted] = useState(false);
+  const [answerSubmissions, setAnswerSubmissions] = useState<ParticipantAnsweredData[]>([]);
+  
   const socketRef = useRef<Socket | null>(null);
 
   // Cập nhật stats khi participants thay đổi
@@ -123,20 +162,16 @@ export const useSocket = ({ sessionId, role, token, autoConnect = true }: UseSoc
   // Hàm để sync participants
   const syncParticipants = useCallback(() => {
     if (socketRef.current && isConnected) {
-      console.log('🔄 Requesting participant list sync...');
       socketRef.current.emit('get-participant-list');
     }
   }, [isConnected]);
 
   useEffect(() => {
     if (!sessionId || !role || !token) {
-      console.log('Thiếu thông tin cần thiết để kết nối socket:', { sessionId, role, token });
       return;
     }
 
     const socketUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/quiz-sessions`;
-    console.log('Đang kết nối tới socket URL:', socketUrl);
-    console.log('Thông tin kết nối:', { sessionId, role, token });
     
     socketRef.current = io(socketUrl, {
       autoConnect,
@@ -156,7 +191,6 @@ export const useSocket = ({ sessionId, role, token, autoConnect = true }: UseSoc
 
     // Đăng ký các sự kiện cơ bản
     socket.on('connect', () => {
-      console.log('✅ Socket đã kết nối thành công');
       setIsConnected(true);
       setError(null);
       
@@ -166,72 +200,61 @@ export const useSocket = ({ sessionId, role, token, autoConnect = true }: UseSoc
       }, 500);
     });
 
-    socket.on('test-connection', (data: TestConnectionData) => {
-      console.log('✅ Nhận thông báo kết nối:', data);
-      setTestMessage(data.message);
+    socket.on('test-connection', (_data: TestConnectionData) => {
+      setTestMessage(_data.message);
     });
 
-    socket.on('test-message-received', (data: TestMessageData) => {
-      console.log('📨 Nhận tin nhắn test:', data);
+    socket.on('test-message-received', () => {
+      // Silent
     });
 
     socket.on('connect_error', (err: Error) => {
-      console.error('❌ Lỗi kết nối:', err.message);
       setError(`Lỗi kết nối: ${err.message}`);
       setIsConnected(false);
     });
 
     socket.on('disconnect', (reason: string) => {
-      console.log('❌ Socket đã ngắt kết nối:', reason);
       setIsConnected(false);
       
       if (reason === 'io client disconnect') {
-        console.log('Đang thử kết nối lại...');
         socket.connect();
       }
     });
 
     // Event handlers cải thiện cho participants
-    socket.on('participant-joined', (data: ParticipantJoinedData) => {
-      console.log('👥 Người tham gia mới:', data);
-      setRecentActivity(`${data.fullName} đã tham gia`);
-      
-      // Không tự động thêm vào danh sách, đợi participant-list-updated
-      // để tránh duplicate và đảm bảo consistency
+    socket.on('participant-joined', (_data: ParticipantJoinedData) => {
+      setRecentActivity(`${_data.fullName} đã tham gia`);
     });
 
-    socket.on('participant-left', (data: ParticipantLeftData) => {
-      console.log('❌ Người tham gia rời đi:', data);
-      setRecentActivity(`${data.fullName} đã rời khỏi phòng`);
+    socket.on('participant-left', (_data: ParticipantLeftData) => {
+      setRecentActivity(`${_data.fullName} đã rời khỏi phòng`);
       
       // Xóa khỏi danh sách ngay lập tức cho UX mượt mà
       setParticipants(prev => {
-        const updated = prev.filter(p => p.userId !== data.userId);
+        const updated = prev.filter(p => p.userId !== _data.userId);
         updateConnectionStats(updated);
         return updated;
       });
     });
 
-    socket.on('participant-ready', (data: ParticipantReadyData) => {
-      console.log('✅ Người tham gia sẵn sàng:', data);
-      setRecentActivity(`${data.fullName} đã sẵn sàng`);
+    socket.on('participant-ready', (_data: ParticipantReadyData) => {
+      setRecentActivity(`${_data.fullName} đã sẵn sàng`);
       
       setParticipants(prev => {
         const updated = prev.map(p => 
-          p.userId === data.userId ? {...p, ready: true} : p
+          p.userId === _data.userId ? {...p, ready: true} : p
         );
         updateConnectionStats(updated);
         return updated;
       });
     });
 
-    socket.on('participant-not-ready', (data: ParticipantReadyData) => {
-      console.log('⏳ Người tham gia chưa sẵn sàng:', data);
-      setRecentActivity(`${data.fullName} chưa sẵn sàng`);
+    socket.on('participant-not-ready', (_data: ParticipantReadyData) => {
+      setRecentActivity(`${_data.fullName} chưa sẵn sàng`);
       
       setParticipants(prev => {
         const updated = prev.map(p => 
-          p.userId === data.userId ? {...p, ready: false} : p
+          p.userId === _data.userId ? {...p, ready: false} : p
         );
         updateConnectionStats(updated);
         return updated;
@@ -239,35 +262,165 @@ export const useSocket = ({ sessionId, role, token, autoConnect = true }: UseSoc
     });
 
     // Event handler quan trọng nhất - cập nhật danh sách đầy đủ
-    socket.on('participant-list-updated', (data: ParticipantData[]) => {
-      console.log('📋 Cập nhật danh sách participants:', data);
-      setParticipants(data);
-      updateConnectionStats(data);
+    socket.on('participant-list-updated', (_data: ParticipantData[]) => {
+      setParticipants(_data);
+      updateConnectionStats(_data);
     });
 
-    socket.on('session-started', (data: { sessionId: string; timestamp: string }) => {
-      console.log('🚀 Phiên bắt đầu:', data);
-      setRecentActivity('Phiên quiz đã bắt đầu');
+    // Cập nhật session events để có navigation
+    socket.on('session-started', (_data) => {
+      setSessionStatus('ACTIVE');
+      
+      if (role === 'STUDENT') {
+        // Lấy sessionId từ data hoặc sử dụng sessionId hiện tại
+        const currentSessionId = _data.sessionId || _data.sessionCode || _data.code || sessionId;
+        
+        // Lấy quizId từ session info để tạo URL đúng
+        let quizId: string | null = null;
+        
+        // Thử nhiều cách để lấy quizId
+        // Cách 1: Từ session_info_${currentSessionId}
+        const sessionInfo = localStorage.getItem(`session_info_${currentSessionId}`);
+        if (sessionInfo) {
+          try {
+            const parsedSession = JSON.parse(sessionInfo);
+            if (parsedSession && parsedSession.quiz && parsedSession.quiz.id) {
+              quizId = parsedSession.quiz.id;
+            }
+          } catch {
+            // Silent
+          }
+        }
+        
+        // Cách 2: Từ session_info_${sessionId} (nếu currentSessionId khác sessionId)
+        if (!quizId && currentSessionId !== sessionId) {
+          const sessionInfoById = localStorage.getItem(`session_info_${sessionId}`);
+          if (sessionInfoById) {
+            try {
+              const parsedSession = JSON.parse(sessionInfoById);
+              if (parsedSession && parsedSession.quiz && parsedSession.quiz.id) {
+                quizId = parsedSession.quiz.id;
+              }
+            } catch {
+              // Silent
+            }
+          }
+        }
+        
+        // Bắt buộc phải có quizId mới navigate
+        if (!quizId) {
+          return;
+        }
+        
+        // Tạo URL với sessionId (không phải sessionCode)
+        const navigationPath = `/quiz/play/${currentSessionId}?quizId=${quizId}`;
+        
+        setShouldNavigate({
+          path: navigationPath,
+          delay: 1500
+        });
+      }
     });
 
-    socket.on('session-ended', (data: { sessionId: string; timestamp: string }) => {
-      console.log('🏁 Phiên kết thúc:', data);
+    socket.on('session-ended', () => {
+      setSessionStatus('ENDED');
       setRecentActivity('Phiên quiz đã kết thúc');
+      
+      // Navigation dựa trên role
+      if (role === 'STUDENT') {
+        setShouldNavigate({ 
+          path: `/sessions/${sessionId}/results`,
+          delay: 2000 
+        });
+      } else if (role === 'PROCTOR') {
+        setShouldNavigate({ 
+          path: `/dashboard/sessions/${sessionId}/results`,
+          delay: 1000 
+        });
+      }
     });
 
-    // Thêm các event listeners cho question control
-    socket.on('question-started', (data: QuestionStartData) => {
-      console.log('📝 Câu hỏi bắt đầu:', data);
+    socket.on('session-status-changed', (_data: SessionStatusData) => {
+      setSessionStatus(_data.status);
+      
+      // Cập nhật activity message
+      const statusMessages = {
+        'PENDING': 'Đang chờ bắt đầu',
+        'ACTIVE': 'Phiên đang diễn ra',
+        'ENDED': 'Phiên đã kết thúc',
+        'COMPLETED': 'Phiên đã hoàn thành',
+        'CANCELED': 'Phiên đã bị hủy'
+      };
+      setRecentActivity(statusMessages[_data.status] || `Trạng thái: ${_data.status}`);
+    });
+
+    // Thêm event listeners cho question control
+    socket.on('question-started', (data: QuestionStartData & { startTime: string }) => {
+      setQuestionStarted(true);
+      setCurrentQuestion({
+        questionId: data.questionId,
+        questionIndex: data.questionIndex,
+        question: data.question,
+        timeLeft: data.timeLimit,
+        startTime: data.startTime,
+        isActive: true
+      });
       setRecentActivity(`Câu hỏi ${data.questionIndex + 1} đã bắt đầu`);
+      
+      // Đặt timer để countdown
+      const startTime = new Date(data.startTime).getTime();
+      const timer = setInterval(() => {
+        const now = Date.now();
+        const elapsed = Math.floor((now - startTime) / 1000);
+        const remaining = Math.max(0, data.timeLimit - elapsed);
+        
+        setCurrentQuestion(prev => prev ? { ...prev, timeLeft: remaining } : null);
+        
+        if (remaining <= 0) {
+          clearInterval(timer);
+          setQuestionStarted(false);
+          setCurrentQuestion(prev => prev ? { ...prev, isActive: false } : null);
+        }
+      }, 1000);
     });
 
-    socket.on('question-ended', (data: QuestionEndData) => {
-      console.log('✅ Câu hỏi kết thúc:', data);
-      setRecentActivity(`Câu hỏi đã kết thúc`);
+    socket.on('question-ended', () => {
+      setQuestionStarted(false);
+      setCurrentQuestion(prev => prev ? { ...prev, isActive: false } : null);
+      setRecentActivity('Câu hỏi đã kết thúc');
+      
+      // Sau 3 giây clear current question
+      setTimeout(() => {
+        setCurrentQuestion(null);
+        setAnswerSubmissions([]);
+      }, 3000);
     });
 
-    socket.on('answer-submitted', (data: { userId: string; questionId: string; answer: string }) => {
-      console.log('📝 Có câu trả lời mới:', data);
+    socket.on('participant-answered', (data: ParticipantAnsweredData) => {
+      console.log('📝 [SOCKET] Participant answered:', data);
+      setAnswerSubmissions(prev => {
+        // Tránh duplicate
+        const exists = prev.find(a => a.userId === data.userId && a.questionId === data.questionId);
+        if (!exists) {
+          return [...prev, data];
+        }
+        return prev;
+      });
+      setRecentActivity(`${data.fullName} đã trả lời`);
+    });
+
+    socket.on('current-question', (data: CurrentQuestionState | null) => {
+      if (data) {
+        setCurrentQuestion(data);
+        setQuestionStarted(data.isActive);
+      } else {
+        setCurrentQuestion(null);
+        setQuestionStarted(false);
+      }
+    });
+
+    socket.on('answer-submitted', () => {
+      // Silent
     });
 
     socket.on('pong', () => {
@@ -275,7 +428,6 @@ export const useSocket = ({ sessionId, role, token, autoConnect = true }: UseSoc
     });
 
     socket.on('error', (errorData: { message: string }) => {
-      console.error('🚨 Socket error:', errorData);
       setError(errorData.message);
     });
 
@@ -294,51 +446,69 @@ export const useSocket = ({ sessionId, role, token, autoConnect = true }: UseSoc
   // Các hàm action được cải thiện
   const markReady = useCallback(() => {
     if (socketRef.current && isConnected) {
-      console.log('✅ Đánh dấu sẵn sàng');
       socketRef.current.emit('mark-ready');
     }
   }, [isConnected]);
 
   const markNotReady = useCallback(() => {
     if (socketRef.current && isConnected) {
-      console.log('⏳ Hủy trạng thái sẵn sàng');
       socketRef.current.emit('mark-not-ready');
     }
   }, [isConnected]);
 
   const startSession = useCallback(() => {
     if (socketRef.current && isConnected) {
-      console.log('🚀 Bắt đầu phiên');
       socketRef.current.emit('start-session');
     }
   }, [isConnected]);
 
   const endSession = useCallback(() => {
     if (socketRef.current && isConnected) {
-      console.log('🏁 Kết thúc phiên');
       socketRef.current.emit('end-session');
     }
   }, [isConnected]);
 
+  // Các hàm action cho question control
   const startQuestion = useCallback((data: QuestionStartData) => {
-    if (socketRef.current && isConnected) {
-      console.log('📤 Starting question:', data);
+    if (socketRef.current && isConnected && role === 'PROCTOR') {
       socketRef.current.emit('start-question', {
         sessionId,
         ...data
       });
     }
-  }, [isConnected, sessionId]);
+  }, [isConnected, sessionId, role]);
 
   const endQuestion = useCallback((data: QuestionEndData) => {
-    if (socketRef.current && isConnected) {
-      console.log('📤 Ending question:', data);
+    if (socketRef.current && isConnected && role === 'PROCTOR') {
       socketRef.current.emit('end-question', {
         sessionId,
         ...data
       });
     }
-  }, [isConnected, sessionId]);
+  }, [isConnected, sessionId, role]);
+
+  const submitAnswerEvent = useCallback((data: {
+    questionId: string;
+    optionId: string;
+    responseTime: number;
+  }) => {
+    if (socketRef.current && isConnected && role === 'STUDENT') {
+      console.log('📤 [SOCKET] Submitting answer event:', data);
+      socketRef.current.emit('answer-submitted', data);
+    }
+  }, [isConnected, role]);
+
+  const getCurrentQuestion = useCallback(() => {
+    if (socketRef.current && isConnected) {
+      socketRef.current.emit('get-current-question');
+    }
+  }, [isConnected]);
+
+  const autoNextQuestion = useCallback(() => {
+    if (socketRef.current && isConnected && role === 'PROCTOR') {
+      socketRef.current.emit('auto-next-question');
+    }
+  }, [isConnected, role]);
 
   const sendPing = useCallback(() => {
     if (socketRef.current && isConnected) {
@@ -357,12 +527,23 @@ export const useSocket = ({ sessionId, role, token, autoConnect = true }: UseSoc
     participants,
     connectionStats,
     recentActivity,
+    sessionStatus,
+    shouldNavigate,
+    setShouldNavigate,
+    // Question control states
+    currentQuestion,
+    questionStarted,
+    answerSubmissions,
+    // Actions
     markReady,
     markNotReady,
     startSession,
     endSession,
     startQuestion,
     endQuestion,
+    submitAnswerEvent,
+    getCurrentQuestion,
+    autoNextQuestion,
     sendPing,
     syncParticipants
   };

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,10 +32,12 @@ interface SocketParticipant {
 
 const WaitingRoom: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const navigate = useNavigate();
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUserReady, setIsUserReady] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string>('Đang chờ giảng viên bắt đầu session...');
 
   const { 
     isConnected, 
@@ -43,6 +45,9 @@ const WaitingRoom: React.FC = () => {
     participants: socketParticipants,
     connectionStats,
     recentActivity,
+    sessionStatus,
+    shouldNavigate,
+    setShouldNavigate,
     markReady,
     markNotReady,
     syncParticipants
@@ -51,6 +56,28 @@ const WaitingRoom: React.FC = () => {
     role: 'STUDENT',
     token: localStorage.getItem('token') || ''
   });
+
+  // Xử lý auto navigation khi session bắt đầu
+  useEffect(() => {
+    if (shouldNavigate) {
+      console.log('🎯 [WAITING] Auto navigating to:', shouldNavigate.path);
+      
+      const delay = shouldNavigate.delay || 1000;
+      const timer = setTimeout(() => {
+        navigate(shouldNavigate.path);
+        setShouldNavigate(null); // Reset navigation state
+      }, delay);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [shouldNavigate, navigate, setShouldNavigate]);
+
+  // Hiển thị thông báo khi session bắt đầu
+  useEffect(() => {
+    if (sessionStatus === 'ACTIVE') {
+      setStatusMessage('🚀 Quiz đang bắt đầu! Đang chuyển hướng...');
+    }
+  }, [sessionStatus]);
 
   // Thêm log để debug
   useEffect(() => {
@@ -287,6 +314,48 @@ const WaitingRoom: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-100 via-pink-100 to-blue-100 p-4 md:p-8">
       <Card className="max-w-4xl mx-auto p-6 md:p-8 bg-white/80 backdrop-blur-lg rounded-2xl shadow-xl">
+        {/* Hiển thị overlay khi đang chuyển hướng */}
+        <AnimatePresence>
+          {shouldNavigate && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-purple-600/90 backdrop-blur-md z-50 flex items-center justify-center"
+            >
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="bg-white rounded-2xl p-8 text-center max-w-md mx-4"
+              >
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="text-6xl mb-4"
+                >
+                  🚀
+                </motion.div>
+                <h2 className="text-2xl font-bold text-purple-800 mb-2">
+                  Quiz Bắt Đầu!
+                </h2>
+                <p className="text-gray-600 mb-4">
+                  Đang chuyển hướng đến trang quiz...
+                </p>
+                <motion.div
+                  className="w-full bg-purple-200 rounded-full h-2"
+                  initial={{ width: 0 }}
+                >
+                  <motion.div
+                    className="bg-purple-600 h-2 rounded-full"
+                    animate={{ width: "100%" }}
+                    transition={{ duration: shouldNavigate.delay ? shouldNavigate.delay / 1000 : 1.5 }}
+                  />
+                </motion.div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="text-center mb-8">
           <motion.div
             initial={{ scale: 0.8, opacity: 0 }}
@@ -317,7 +386,7 @@ const WaitingRoom: React.FC = () => {
           </motion.div>
         </div>
 
-        {/* Hiển thị trạng thái kết nối realtime */}
+        {/* Hiển thị trạng thái session realtime */}
         <div className="text-center mb-6">
           <motion.div
             className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${
@@ -333,6 +402,31 @@ const WaitingRoom: React.FC = () => {
           >
             {isConnected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
             <span>{isConnected ? 'Kết nối realtime' : 'Mất kết nối'}</span>
+          </motion.div>
+          
+          {/* Hiển thị trạng thái session */}
+          <motion.div
+            className={`mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
+              sessionStatus === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+              sessionStatus === 'ACTIVE' ? 'bg-green-100 text-green-800' :
+              'bg-gray-100 text-gray-800'
+            }`}
+            animate={sessionStatus === 'ACTIVE' ? {
+              scale: [1, 1.1, 1],
+              backgroundColor: ['#dcfce7', '#bbf7d0', '#dcfce7']
+            } : {}}
+            transition={{
+              duration: 1,
+              repeat: sessionStatus === 'ACTIVE' ? Infinity : 0
+            }}
+          >
+            {sessionStatus === 'PENDING' && <Clock className="w-4 h-4" />}
+            {sessionStatus === 'ACTIVE' && <CheckCircle className="w-4 h-4" />}
+            <span>
+              {sessionStatus === 'PENDING' ? 'Đang chờ bắt đầu' :
+               sessionStatus === 'ACTIVE' ? 'Đang bắt đầu...' :
+               'Session đã kết thúc'}
+            </span>
           </motion.div>
         </div>
 
@@ -405,17 +499,41 @@ const WaitingRoom: React.FC = () => {
           </Card>
         </motion.div>
 
-        {/* Recent Activity */}
-        {recentActivity && (
+        {/* Recent Activity với animation đặc biệt cho session start */}
+        {(recentActivity || statusMessage) && (
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="mb-6 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-400"
+            className={`mb-6 p-3 rounded-lg border-l-4 ${
+              sessionStatus === 'ACTIVE' 
+                ? 'bg-green-50 border-green-400'
+                : 'bg-blue-50 border-blue-400'
+            }`}
           >
-            <p className="text-sm text-blue-800 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" />
-              {recentActivity}
-            </p>
+            <motion.p 
+              className={`text-sm font-medium flex items-center gap-2 ${
+                sessionStatus === 'ACTIVE' ? 'text-green-800' : 'text-blue-800'
+              }`}
+              animate={sessionStatus === 'ACTIVE' ? {
+                scale: [1, 1.05, 1]
+              } : {}}
+              transition={{
+                duration: 0.5,
+                repeat: sessionStatus === 'ACTIVE' ? 3 : 0
+              }}
+            >
+              {sessionStatus === 'ACTIVE' ? (
+                <motion.span
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                >
+                  🚀
+                </motion.span>
+              ) : (
+                <AlertCircle className="w-4 h-4" />
+              )}
+              {sessionStatus === 'ACTIVE' ? statusMessage : recentActivity}
+            </motion.p>
           </motion.div>
         )}
 
@@ -525,9 +643,13 @@ const WaitingRoom: React.FC = () => {
           </AnimatePresence>
         </motion.div>
 
-        {/* Thông tin phòng */}
+        {/* Thông tin phòng với trạng thái session */}
         <motion.div 
-          className="text-center space-y-4 bg-purple-50 p-4 rounded-xl"
+          className={`text-center space-y-4 p-4 rounded-xl ${
+            sessionStatus === 'ACTIVE' 
+              ? 'bg-green-50 border border-green-200'
+              : 'bg-purple-50'
+          }`}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
@@ -535,23 +657,44 @@ const WaitingRoom: React.FC = () => {
           <div className="flex items-center justify-center gap-2 text-purple-800">
             <span className="font-medium">Mã phòng:</span>
             <span className="font-mono font-bold bg-white px-2 py-1 rounded-md">
-              {session.code}
+              {session?.code}
             </span>
           </div>
           <p className="text-gray-600 flex items-center justify-center gap-2">
-            <span>Đang chờ bắt đầu</span>
-            <motion.span 
-              animate={{
-                opacity: [0, 1, 0],
-                transition: { repeat: Infinity, duration: 1.5 }
-              }}
-            >
-              ⏳
-            </motion.span>
+            {sessionStatus === 'PENDING' && (
+              <>
+                <span>Đang chờ bắt đầu</span>
+                <motion.span 
+                  animate={{
+                    opacity: [0, 1, 0],
+                    transition: { repeat: Infinity, duration: 1.5 }
+                  }}
+                >
+                  ⏳
+                </motion.span>
+              </>
+            )}
+            {sessionStatus === 'ACTIVE' && (
+              <>
+                <span>Đang bắt đầu quiz!</span>
+                <motion.span 
+                  animate={{
+                    scale: [1, 1.2, 1],
+                    rotate: [0, 360]
+                  }}
+                  transition={{ 
+                    repeat: Infinity, 
+                    duration: 1 
+                  }}
+                >
+                  🚀
+                </motion.span>
+              </>
+            )}
           </p>
         </motion.div>
 
-        {/* Nút điều khiển */}
+        {/* Nút điều khiển - disable khi session active */}
         <motion.div 
           className="flex justify-center mt-8"
           initial={{ opacity: 0, y: 20 }}
@@ -560,15 +703,28 @@ const WaitingRoom: React.FC = () => {
         >
           <Button
             onClick={handleToggleReady}
-            disabled={!isConnected}
+            disabled={!isConnected || sessionStatus === 'ACTIVE'}
             size="lg"
             className={`px-8 py-3 text-lg font-semibold transition-all duration-300 ${
-              isUserReady 
+              sessionStatus === 'ACTIVE'
+                ? 'bg-green-600 text-white cursor-not-allowed'
+                : isUserReady 
                 ? 'bg-green-600 hover:bg-green-700 text-white' 
                 : 'bg-blue-600 hover:bg-blue-700 text-white'
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
+            } disabled:opacity-50`}
           >
-            {isUserReady ? (
+            {sessionStatus === 'ACTIVE' ? (
+              <>
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="w-5 h-5 mr-2"
+                >
+                  🚀
+                </motion.div>
+                Đang bắt đầu...
+              </>
+            ) : isUserReady ? (
               <>
                 <CheckCircle className="w-5 h-5 mr-2" />
                 Đã sẵn sàng

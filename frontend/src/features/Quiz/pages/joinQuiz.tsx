@@ -126,8 +126,16 @@ export default function QuizPage() {
       console.log("Response:", response);
       
       // Lấy mã quiz và mã phiên từ response
-      const sessionCodeFromResponse = response.session.code;
+      const sessionIdFromResponse = response.session.id;
       const quizIdFromResponse = response.quiz.id;
+      
+      // Debug logging để kiểm tra values
+      console.log("🔍 [JOIN] Debug values:", {
+        sessionIdFromResponse,
+        quizIdFromResponse,
+        hasQuizId: !!quizIdFromResponse,
+        quizObject: response.quiz
+      });
       
       // Lưu token vào localStorage
       if (response.token) {
@@ -138,26 +146,38 @@ export default function QuizPage() {
       // Lưu participantId vào localStorage để sử dụng sau này
       if (response.participant && response.participant.id) {
         console.log("Lưu participantId:", response.participant.id);
-        localStorage.setItem(`participant_${sessionCodeFromResponse}`, response.participant.id);
+        localStorage.setItem(`participant_${sessionIdFromResponse}`, response.participant.id);
       }
 
       // Lưu thông tin session đầy đủ vào localStorage
       if (response.session) {
         console.log("Lưu thông tin session đầy đủ:", response.session);
-        localStorage.setItem(`session_info_${sessionCodeFromResponse}`, JSON.stringify(response.session));
+        // Lưu cả session và quiz info để có quiz.code
+        const sessionWithQuiz = {
+          ...response.session,
+          quiz: response.quiz // Thêm quiz info để có quiz.code
+        };
+        localStorage.setItem(`session_info_${sessionIdFromResponse}`, JSON.stringify(sessionWithQuiz));
         
-        // Đặc biệt in ra session.id để debug
+        // Đặc biệt in ra session.id và quiz.code để debug
         if (response.session.id) {
           console.log("Session ID đầy đủ:", response.session.id);
+        }
+        if (response.quiz.code) {
+          console.log("Quiz code đầy đủ:", response.quiz.code);
         }
       }
       
       if(response.session.status === 'PENDING'){
-        // Chuyển hướng đến trang chờ
-        navigate(`/quiz/waiting/${response.session.id}`);
+        // Chuyển hướng đến trang chờ với quizId
+        const waitingURL = `/quiz/waiting/${sessionIdFromResponse}?quizId=${quizIdFromResponse}`;
+        console.log("🔗 [JOIN] Navigating to waiting:", waitingURL);
+        navigate(waitingURL);
       } else {
-        // Chuyển hướng đến trang chơi quiz với quizCode và quizId
-        navigate(`/quiz/play/${sessionCodeFromResponse}?quizId=${quizIdFromResponse}`);
+        // Chuyển hướng đến trang chơi quiz với sessionId và quizId
+        const playURL = `/quiz/play/${sessionIdFromResponse}?quizId=${quizIdFromResponse}`;
+        console.log("🔗 [JOIN] Navigating to play:", playURL);
+        navigate(playURL);
       }
     } catch (error) {
       console.error('Lỗi khi tham gia quiz:', error);

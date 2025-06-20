@@ -146,7 +146,8 @@ export const quizApi = {
       const response = await axios.get<{ data: QuizResponseData[] }>(`${API_URL}/quizzes`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`
-        }
+        },
+        withCredentials: true // Hỗ trợ cookies
       });
       
       // Chuyển đổi dữ liệu từ API sang định dạng cần thiết cho UI
@@ -174,14 +175,24 @@ export const quizApi = {
    * Lấy chi tiết một quiz theo ID
    */
   getQuizById: async (id: string): Promise<QuizDetail> => {
-    const response = await axios.get<{ data: QuizDetail }>(`${API_URL}/quizzes/${id}`);
+    const response = await axios.get<{ data: QuizDetail }>(`${API_URL}/quizzes/${id}`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('token')}`
+      },
+      withCredentials: true // Hỗ trợ cookies
+    });
     return response.data.data;
   },
   /**
    * Lấy chi tiết một quiz theo mã tham gia
    */
   getQuizByCode: async (code: string): Promise<QuizDetail> => {
-    const response = await axios.get<{ data: QuizDetail }>(`${API_URL}/quizzes/code/${code}`);
+    const response = await axios.get<{ data: QuizDetail }>(`${API_URL}/quizzes/code/${code}`, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('token')}`
+      },
+      withCredentials: true // Hỗ trợ cookies
+    });
     return response.data.data;
   },
   /**
