@@ -197,6 +197,9 @@ export const useSocket = ({ sessionId, role, token, autoConnect = true }: UseSoc
       // Yêu cầu danh sách participants ngay khi kết nối
       setTimeout(() => {
         socket.emit('get-participant-list');
+        
+        // Yêu cầu thông tin current question để sync state
+        socket.emit('get-current-question');
       }, 500);
     });
 
@@ -323,18 +326,45 @@ export const useSocket = ({ sessionId, role, token, autoConnect = true }: UseSoc
     });
 
     socket.on('session-ended', () => {
+      console.log('🏁 [SOCKET] Session ended event received');
       setSessionStatus('ENDED');
       setRecentActivity('Phiên quiz đã kết thúc');
       
       // Navigation dựa trên role
       if (role === 'STUDENT') {
-        setShouldNavigate({ 
-          path: `/sessions/${sessionId}/results`,
-          delay: 2000 
+        // Lấy participantId từ localStorage
+        const participantId = localStorage.getItem(`participant_${sessionId}`) || 
+                            localStorage.getItem('participantId') ||
+                            localStorage.getItem('userId');
+        
+        console.log('🔍 [SOCKET] Navigation data:', {
+          role,
+          sessionId,
+          participantId,
+          hasParticipantId: !!participantId
         });
+        
+        if (participantId) {
+          const navPath = `/answers/participants/${participantId}/results`;
+          console.log('🔗 [SOCKET] Navigating to:', navPath);
+          setShouldNavigate({ 
+            path: navPath,
+            delay: 2000 
+          });
+        } else {
+          // Fallback nếu không có participantId
+          const fallbackPath = `/sessions/${sessionId}/results`;
+          console.log('🔗 [SOCKET] Fallback navigation to:', fallbackPath);
+          setShouldNavigate({ 
+            path: fallbackPath,
+            delay: 2000 
+          });
+        }
       } else if (role === 'PROCTOR') {
+        const proctorPath = `/dashboard/sessions/${sessionId}/results`;
+        console.log('🔗 [SOCKET] Proctor navigation to:', proctorPath);
         setShouldNavigate({ 
-          path: `/dashboard/sessions/${sessionId}/results`,
+          path: proctorPath,
           delay: 1000 
         });
       }
@@ -356,19 +386,71 @@ export const useSocket = ({ sessionId, role, token, autoConnect = true }: UseSoc
 
     // Thêm event listeners cho question control
     socket.on('question-started', (data: QuestionStartData & { startTime: string }) => {
+      console.log('🚀 [SOCKET] Question started event received:', {
+        questionId: data.questionId,
+        questionIndex: data.questionIndex,
+        timeLimit: data.timeLimit,
+        startTime: data.startTime,
+        currentTime: new Date().toISOString()
+      });
+
       setQuestionStarted(true);
+      
+      // Tắt realtime timer - chỉ set state ban đầu
       setCurrentQuestion({
         questionId: data.questionId,
         questionIndex: data.questionIndex,
         question: data.question,
-        timeLeft: data.timeLimit,
+        timeLeft: data.timeLimit, // Set thời gian đầy đủ, không countdown
+        startTime: data.startTime,
+        isActive: true
+      });
+      setRecentActivity(`Câu hỏi ${data.questionIndex + 1} đã bắt đầu`);
+      
+      // COMMENT OUT: Tắt countdown timer realtime
+      /*
+      // Tính toán thời gian còn lại
+      const startTime = new Date(data.startTime).getTime();
+      const now = Date.now();
+      const elapsed = Math.floor((now - startTime) / 1000);
+      const remaining = Math.max(0, data.timeLimit - elapsed);
+      
+      console.log('⏰ [SOCKET] Time calculation:', {
+        startTime: data.startTime,
+        startTimeMs: startTime,
+        nowMs: now,
+        elapsed: elapsed,
+        timeLimit: data.timeLimit,
+        remaining: remaining,
+        isExpired: remaining <= 0
+      });
+      
+      // Nếu question đã hết thời gian, không cần set timer
+      if (remaining <= 0) {
+        console.log('⚠️ [SOCKET] Question already expired, not setting timer');
+        setCurrentQuestion({
+          questionId: data.questionId,
+          questionIndex: data.questionIndex,
+          question: data.question,
+          timeLeft: 0,
+          startTime: data.startTime,
+          isActive: false
+        });
+        setQuestionStarted(false);
+        return;
+      }
+      
+      setCurrentQuestion({
+        questionId: data.questionId,
+        questionIndex: data.questionIndex,
+        question: data.question,
+        timeLeft: remaining,
         startTime: data.startTime,
         isActive: true
       });
       setRecentActivity(`Câu hỏi ${data.questionIndex + 1} đã bắt đầu`);
       
       // Đặt timer để countdown
-      const startTime = new Date(data.startTime).getTime();
       const timer = setInterval(() => {
         const now = Date.now();
         const elapsed = Math.floor((now - startTime) / 1000);
@@ -377,11 +459,13 @@ export const useSocket = ({ sessionId, role, token, autoConnect = true }: UseSoc
         setCurrentQuestion(prev => prev ? { ...prev, timeLeft: remaining } : null);
         
         if (remaining <= 0) {
+          console.log('⏰ [SOCKET] Question timer expired');
           clearInterval(timer);
           setQuestionStarted(false);
           setCurrentQuestion(prev => prev ? { ...prev, isActive: false } : null);
         }
       }, 1000);
+      */
     });
 
     socket.on('question-ended', () => {
@@ -410,10 +494,19 @@ export const useSocket = ({ sessionId, role, token, autoConnect = true }: UseSoc
     });
 
     socket.on('current-question', (data: CurrentQuestionState | null) => {
+      console.log('📋 [SOCKET] Received current-question data:', data);
+      
       if (data) {
+        console.log('📋 [SOCKET] Setting current question:', {
+          questionId: data.questionId,
+          questionIndex: data.questionIndex,
+          timeLeft: data.timeLeft,
+          isActive: data.isActive
+        });
         setCurrentQuestion(data);
         setQuestionStarted(data.isActive);
       } else {
+        console.log('📋 [SOCKET] No current question, clearing state');
         setCurrentQuestion(null);
         setQuestionStarted(false);
       }

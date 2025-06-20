@@ -1,25 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import type { QuizDetail } from '../../Quiz/api/quizApi';
 import { quizApi } from '../../Quiz/api/quizApi';
 import { participantApi } from '../api/participantApi';
 import type { ParticipantResult } from '../api/participantApi';
 
-interface ResultProps {
-  quizId?: string;
-  sessionCode?: string;
-}
-
-const ResultPage: React.FC<ResultProps> = ({ quizId: propQuizId, sessionCode: propSessionCode }) => {
-  const { quizId: paramQuizId } = useParams<{ quizId: string }>();
+const ResultPage: React.FC = () => {
+  const { participantId } = useParams<{ participantId: string }>();
   const navigate = useNavigate();
-  const location = useLocation();
-  const queryParams = new URLSearchParams(location.search);
-  const querySessionCode = queryParams.get('sessionCode');
-
-  // Ưu tiên sử dụng props, nếu không có thì dùng query params, sau đó mới dùng localStorage
-  const quizId = propQuizId || paramQuizId;
-  const sessionCode = propSessionCode || querySessionCode || localStorage.getItem(`session_${quizId}`) || '';
 
   const [quiz, setQuiz] = useState<QuizDetail | null>(null);
   const [result, setResult] = useState<ParticipantResult | null>(null);
@@ -31,11 +19,9 @@ const ResultPage: React.FC<ResultProps> = ({ quizId: propQuizId, sessionCode: pr
 
   useEffect(() => {
     const fetchResultData = async () => {
-      // Lấy participantId từ localStorage
-      const participantId = localStorage.getItem(`participant_${sessionCode}`);
-      
+      // Lấy participantId từ URL params
       if (!participantId) {
-        console.warn('Không tìm thấy participantId trong localStorage');
+        console.warn('Không tìm thấy participantId trong URL params');
         setError('Không thể lấy kết quả - thiếu thông tin người tham gia');
         setIsLoading(false);
         return;
@@ -43,9 +29,9 @@ const ResultPage: React.FC<ResultProps> = ({ quizId: propQuizId, sessionCode: pr
 
       try {
         setIsLoading(true);
-        console.log(`Đã tìm thấy participantId: ${participantId}`);
+        console.log(`Đã tìm thấy participantId từ URL: ${participantId}`);
         
-        // Gọi API với participantId
+        // Gọi API với participantId từ URL params
         const apiResult = await participantApi.getParticipantResults(participantId);
         console.log("Dữ liệu kết quả từ API:", apiResult);
         setResult(apiResult);
@@ -75,7 +61,7 @@ const ResultPage: React.FC<ResultProps> = ({ quizId: propQuizId, sessionCode: pr
     };
 
     fetchResultData();
-  }, [sessionCode]);
+  }, [participantId]);
 
   const handleGoHome = () => {
     navigate('/');

@@ -71,10 +71,17 @@ const RoomPage: React.FC = () => {
         localStorage.setItem(`participant_${sessionCode}`, participantId);
       }
       
-      // Chuyển hướng đến trang kết quả
-      const currentUserId = localStorage.getItem('userId') || participantId || 'guest';
-      navigate(`/answers/participants/${currentUserId}/results?sessionCode=${sessionCode}`);
+      // Chuyển hướng đến trang kết quả với đúng API endpoint
+      if (participantId) {
+        // Sử dụng đúng API endpoint - loại bỏ sessionCode query parameter
+        navigate(`/answers/participants/${participantId}/results`);
+      } else {
+        // Fallback với userId hoặc guest
+        const userId = localStorage.getItem('userId') || 'guest';
+        navigate(`/answers/participants/${userId}/results`);
+      }
     } catch {
+      // Fallback cuối cùng
       navigate(`/result/${quizId}?sessionCode=${sessionCode}`);
     }
   }, [sessionCode, quizId, answers, participantId, navigate]);
@@ -190,12 +197,43 @@ const RoomPage: React.FC = () => {
 
   // Xử lý auto finish khi hết thời gian câu cuối
   useEffect(() => {
+    // TẮT AUTO FINISH DỰA TRÊN THỜI GIAN - Comment out logic
+    /*
+    // Thêm điều kiện để tránh auto finish ngay khi vừa load
     if (currentQuestion && quiz && quiz.questions && currentQuestion.timeLeft <= 0) {
-      // Nếu đây là câu hỏi cuối và hết thời gian
-      if (currentQuestionIndex >= quiz.questions.length - 1) {
+      console.log('⚠️ [ROOM] Question time expired, checking if should auto finish:', {
+        questionIndex: currentQuestionIndex,
+        totalQuestions: quiz.questions.length,
+        timeLeft: currentQuestion.timeLeft,
+        isActive: currentQuestion.isActive,
+        isLastQuestion: currentQuestionIndex >= quiz.questions.length - 1
+      });
+      
+      // Chỉ auto finish nếu:
+      // 1. Đây là câu hỏi cuối cùng
+      // 2. Question đã inactive (đã kết thúc thực sự) - kiểm tra an toàn
+      // 3. currentQuestion.isActive không phải undefined (nghĩa là đã được set rõ ràng)
+      if (currentQuestionIndex >= quiz.questions.length - 1 && 
+          currentQuestion.isActive === false &&
+          typeof currentQuestion.isActive !== 'undefined') {
+        console.log('🏁 [ROOM] Auto finishing quiz - last question ended');
         handleFinish();
+      } else {
+        console.log('⏸️ [ROOM] Question expired but not auto finishing:', {
+          reason: currentQuestionIndex < quiz.questions.length - 1 
+            ? 'Not last question' 
+            : currentQuestion.isActive === true
+            ? 'Question still active'
+            : currentQuestion.isActive === undefined
+            ? 'isActive is undefined'
+            : 'Other reason'
+        });
       }
     }
+    */
+    
+    // Không tự động finish dựa trên thời gian - chỉ finish khi có signal từ socket
+    return;
   }, [currentQuestion, quiz, currentQuestionIndex, handleFinish]);
 
   // Xử lý khi người dùng trả lời câu hỏi - CẢI THIỆN VỚI SOCKET
@@ -460,10 +498,19 @@ const RoomPage: React.FC = () => {
           quiz.questions.length > 0 && 
           currentQuestion && 
           currentQuestion.questionIndex >= 0 &&
-          currentQuestion.questionIndex < quiz.questions.length;
+          currentQuestion.questionIndex < quiz.questions.length &&
+          currentQuestion.isActive === true &&  // Kiểm tra chính xác bằng true
+          currentQuestion.timeLeft > 0;
           
         if (shouldRender) {
           const questionData = quiz.questions[currentQuestion.questionIndex];
+          
+          console.log('🎯 [ROOM] Rendering active question:', {
+            questionIndex: currentQuestion.questionIndex,
+            timeLeft: currentQuestion.timeLeft,
+            isActive: currentQuestion.isActive,
+            questionContent: questionData.content.substring(0, 50) + '...'
+          });
           
           return (
             <QuestionScreen
@@ -494,7 +541,7 @@ const RoomPage: React.FC = () => {
       })()}
       
       {/* Hiển thị waiting screen khi không có current question hoặc question không active */}
-      {quiz && !currentQuestion && !isLoading && (
+      {quiz && (!currentQuestion || currentQuestion.isActive !== true || currentQuestion.timeLeft <= 0) && !isLoading && (
         <div className="min-h-screen bg-gradient-to-br from-purple-100 via-pink-100 to-blue-100 flex items-center justify-center">
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
@@ -509,17 +556,30 @@ const RoomPage: React.FC = () => {
               transition={{ duration: 2, repeat: Infinity }}
               className="text-6xl mb-4"
             >
-              ⏳
+              {currentQuestion && currentQuestion.timeLeft <= 0 ? '⏰' : '⏳'}
             </motion.div>
             <h2 className="text-2xl font-bold text-purple-800 mb-2">
-              Đang chờ câu hỏi...
+              {currentQuestion && currentQuestion.timeLeft <= 0 
+                ? 'Câu hỏi đã kết thúc' 
+                : 'Đang chờ câu hỏi...'}
             </h2>
             <p className="text-gray-600 mb-4">
-              Giám thị sẽ bắt đầu câu hỏi sớm nhất có thể
+              {currentQuestion && currentQuestion.timeLeft <= 0 
+                ? 'Chờ giám thị chuyển sang câu hỏi tiếp theo' 
+                : 'Giám thị sẽ bắt đầu câu hỏi sớm nhất có thể'}
             </p>
             <div className={`text-sm ${isConnected ? 'text-green-600' : 'text-red-600'}`}>
               {isConnected ? '🟢 Kết nối realtime' : '🔴 Mất kết nối'}
             </div>
+            
+            {/* Debug info để xem currentQuestion state */}
+            {currentQuestion && (
+              <div className="mt-4 p-2 bg-gray-100 rounded text-xs text-left">
+                <div>isActive: {String(currentQuestion.isActive)}</div>
+                <div>timeLeft: {currentQuestion.timeLeft}</div>
+                <div>questionIndex: {currentQuestion.questionIndex}</div>
+              </div>
+            )}
           </motion.div>
         </div>
       )}

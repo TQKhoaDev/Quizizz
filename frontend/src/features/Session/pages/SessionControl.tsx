@@ -117,6 +117,8 @@ const SessionControl: React.FC = () => {
   const [isEnding, setIsEnding] = useState(false);
   const [showParticipantDetails, setShowParticipantDetails] = useState(true);
   const [lastParticipantCount, setLastParticipantCount] = useState(0);
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState(false);
+  const [questionsError, setQuestionsError] = useState<string | null>(null);
   
   // State cho quiz realtime
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
@@ -141,7 +143,7 @@ const SessionControl: React.FC = () => {
   const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
 
   // State cho low time warning
-  const [isLowTime, setIsLowTime] = useState(false);
+  // const [isLowTime, setIsLowTime] = useState(false); // TẮT - không dùng khi tắt realtime timer
 
   console.log('🔧 [CONTROL] Debug info:', {
     sessionId,
@@ -195,10 +197,13 @@ const SessionControl: React.FC = () => {
   const loadQuizQuestions = useCallback(async () => {
     if (!session?.quiz?.id) {
       console.warn('⚠️ No quiz ID available');
+      setQuestionsError('Không có ID quiz');
       return;
     }
     
     try {
+      setIsLoadingQuestions(true);
+      setQuestionsError(null);
       console.log('🔄 Loading quiz questions for quiz ID:', session.quiz.id);
       
       // Lấy chi tiết quiz từ API để có danh sách câu hỏi
@@ -230,6 +235,7 @@ const SessionControl: React.FC = () => {
         });
         
         setQuizQuestions(formattedQuestions);
+        setQuestionsError(null);
         
         // Initialize first question
         if (formattedQuestions.length > 0) {
@@ -243,6 +249,8 @@ const SessionControl: React.FC = () => {
             participantAnswers: {}
           }));
         }
+        
+        console.log('✅ Quiz questions loaded successfully:', formattedQuestions.length, 'questions');
       } else {
         console.warn('⚠️ [QUIZ API] No questions found in quiz response');
         console.log('📦 [QUIZ API] Quiz detail structure:', {
@@ -252,6 +260,7 @@ const SessionControl: React.FC = () => {
           quizKeys: quizDetail ? Object.keys(quizDetail) : []
         });
         setQuizQuestions([]);
+        setQuestionsError('Quiz không có câu hỏi nào');
       }
     } catch (error) {
       console.error('❌ [QUIZ API] Error loading quiz questions:', error);
@@ -260,6 +269,9 @@ const SessionControl: React.FC = () => {
         stack: error instanceof Error ? error.stack : undefined
       });
       setQuizQuestions([]);
+      setQuestionsError(error instanceof Error ? error.message : 'Lỗi không xác định khi tải câu hỏi');
+    } finally {
+      setIsLoadingQuestions(false);
     }
   }, [session?.quiz?.id]);
 
@@ -434,6 +446,8 @@ const SessionControl: React.FC = () => {
 
   // Timer effect với tất cả dependencies
   useEffect(() => {
+    // TẮT REALTIME TIMER - Comment out toàn bộ logic countdown
+    /*
     if (!quizState.isQuestionActive || quizState.timeLeft <= 0) return;
 
     const timer = setInterval(() => {
@@ -464,6 +478,10 @@ const SessionControl: React.FC = () => {
     }, 1000);
 
     return () => clearInterval(timer);
+    */
+    
+    // Không có timer countdown - thời gian sẽ hiển thị tĩnh
+    return;
   }, [quizState.isQuestionActive, quizState.timeLeft, handleNextQuestion, socket, quizQuestions, quizState.currentQuestionIndex, playWarningSound]);
 
   // Tính toán thống kê từ socket participants thay vì manual tracking
@@ -539,16 +557,21 @@ const SessionControl: React.FC = () => {
       setIsStarting(true);
       console.log('🚀 [CONTROL] Starting session...');
       
+      // Gọi socket để báo hiệu bắt đầu session
       startSession();
       
+      // Cập nhật session qua API
       const updatedSession = await sessionApi.startSession(sessionId);
       setSession(updatedSession);
       
-      if (updatedSession.quiz?.id) {
-        await loadQuizQuestions();
-      }
+      console.log('✅ Session started successfully, status:', updatedSession.status);
       
-      console.log('✅ Session started successfully');
+      // Force load quiz questions ngay lập tức sau khi session ACTIVE
+      if (updatedSession.quiz?.id && updatedSession.status === 'ACTIVE') {
+        console.log('🎯 [CONTROL] Force loading quiz questions after session start...');
+        await loadQuizQuestions();
+        console.log('🎯 [CONTROL] Quiz questions loaded successfully after session start');
+      }
       
     } catch (error) {
       console.error('❌ [CONTROL] Error starting session:', error);
@@ -649,19 +672,29 @@ const SessionControl: React.FC = () => {
 
   // Effect để load quiz questions khi session thay đổi
   useEffect(() => {
-    if (session?.quiz?.id) {
-      console.log('🔄 [CONTROL] Session has quiz, loading questions...');
+    // Chỉ load questions khi session có quiz ID và đang ACTIVE, hoặc khi quiz questions chưa được load
+    if (session?.quiz?.id && session.status === 'ACTIVE' && quizQuestions.length === 0) {
+      console.log('🔄 [CONTROL] Session is ACTIVE and has quiz, loading questions...');
       console.log('📋 [CONTROL] Session details:', {
         sessionId: session.id,
         quizId: session.quiz.id,
         quizTitle: session.quiz.title,
-        status: session.status
+        status: session.status,
+        hasQuestions: quizQuestions.length > 0
       });
       loadQuizQuestions();
+    } else if (session?.quiz?.id && session.status === 'PENDING' && quizQuestions.length === 0) {
+      // Cũng load questions sẵn khi session ở trạng thái PENDING để chuẩn bị
+      console.log('🔄 [CONTROL] Preloading quiz questions for PENDING session...');
+      loadQuizQuestions();
     } else {
-      console.warn('⚠️ [CONTROL] No quiz ID in session:', session);
+      console.log('⚠️ [CONTROL] Skipping quiz load:', {
+        hasQuizId: !!session?.quiz?.id,
+        status: session?.status,
+        questionsCount: quizQuestions.length
+      });
     }
-  }, [session?.quiz?.id, loadQuizQuestions]);
+  }, [session?.quiz?.id, session?.status, quizQuestions.length, loadQuizQuestions]);
 
   // Hàm để mô tả hoạt động hiện tại
   const getActivityDescription = useCallback((status: string, isQuestionActive: boolean, currentIndex: number, totalQuestions: number): string => {
@@ -1065,7 +1098,7 @@ const SessionControl: React.FC = () => {
         </motion.div>
 
         {/* Quiz Control Panel - Chỉ hiển thị khi session ACTIVE */}
-        {session.status === 'ACTIVE' && quizQuestions.length > 0 && (
+        {session.status === 'ACTIVE' && (
           <motion.div variants={itemVariants}>
             <Card className="p-6 bg-white/80 backdrop-blur-lg rounded-2xl shadow-xl">
               <div className="flex items-center justify-between mb-6">
@@ -1074,216 +1107,279 @@ const SessionControl: React.FC = () => {
                   Điều khiển Quiz Realtime
                 </h2>
                 
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline">
-                    Câu {quizState.currentQuestionIndex + 1}/{quizQuestions.length}
-                  </Badge>
-                  {quizState.isQuestionActive && (
-                    <Badge variant="default" className="bg-green-500">
-                      <Timer className="w-3 h-3 mr-1" />
-                      {quizState.timeLeft}s
+                {quizQuestions.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">
+                      Câu {quizState.currentQuestionIndex + 1}/{quizQuestions.length}
                     </Badge>
-                  )}
-                  {isLowTime && (
-                    <motion.div
-                      animate={{
-                        scale: [1, 1.1, 1],
-                        opacity: [1, 0.7, 1]
-                      }}
-                      transition={{
-                        duration: 0.5,
-                        repeat: Infinity
-                      }}
-                    >
-                      <Badge variant="destructive" className="bg-red-500">
-                        <AlertCircle className="w-3 h-3 mr-1" />
-                        Sắp hết thời gian!
+                    {quizState.isQuestionActive && (
+                      <Badge variant="default" className="bg-green-500">
+                        <Timer className="w-3 h-3 mr-1" />
+                        {quizState.timeLeft}s
                       </Badge>
-                    </motion.div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* Current Question Display */}
-              {quizState.currentQuestion && (
-                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 mb-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Badge variant="outline">
-                          Câu {quizState.currentQuestion.order}
-                        </Badge>
-                        <Badge variant={
-                          quizState.currentQuestion.difficulty === 'EASY' ? 'secondary' :
-                          quizState.currentQuestion.difficulty === 'MEDIUM' ? 'default' :
-                          'destructive'
-                        }>
-                          {quizState.currentQuestion.difficulty === 'EASY' ? 'Dễ' :
-                           quizState.currentQuestion.difficulty === 'MEDIUM' ? 'Trung bình' : 'Khó'}
-                        </Badge>
-                        <Badge variant="outline">
-                          {quizState.currentQuestion.points} điểm
-                        </Badge>
-                      </div>
-                      <h3 className="text-lg font-medium text-gray-800 mb-4">
-                        {quizState.currentQuestion.content}
-                      </h3>
-                      
-                      {/* Answer Options */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {quizState.currentQuestion.options.map((option, index) => (
-                          <div
-                            key={option.id}
-                            className={`p-3 rounded-lg border-2 ${
-                              option.isCorrect 
-                                ? 'border-green-200 bg-green-50' 
-                                : 'border-gray-200 bg-white'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className={`w-6 h-6 flex items-center justify-center rounded-full text-sm font-medium ${
-                                option.isCorrect 
-                                  ? 'bg-green-500 text-white' 
-                                  : 'bg-gray-300 text-gray-700'
-                              }`}>
-                                {String.fromCharCode(65 + index)}
-                              </span>
-                              <span className="text-sm">{option.content}</span>
-                              {option.isCorrect && (
-                                <CheckCircle className="w-4 h-4 text-green-500 ml-auto" />
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    {/* Time Progress */}
-                    <div className="ml-6">
-                      <div className="text-center">
-                        <motion.div 
-                          className={`text-3xl font-bold ${
-                            quizState.timeLeft <= 3 ? 'text-red-500' :
-                            quizState.timeLeft <= 10 ? 'text-yellow-500' : 'text-blue-500'
-                          }`}
-                          animate={isLowTime ? {
-                            scale: [1, 1.2, 1],
-                            textShadow: [
-                              '0 0 0px rgba(239, 68, 68, 0)',
-                              '0 0 20px rgba(239, 68, 68, 0.8)',
-                              '0 0 0px rgba(239, 68, 68, 0)'
-                            ]
-                          } : {}}
-                          transition={{
-                            duration: 1,
-                            repeat: isLowTime ? Infinity : 0
-                          }}
-                        >
-                          {quizState.timeLeft}
-                        </motion.div>
-                        <div className="text-xs text-gray-500">giây</div>
-                        <div className="w-20 h-2 bg-gray-200 rounded-full mt-2">
-                          <motion.div 
-                            className={`h-2 rounded-full transition-all duration-1000 ${
-                              quizState.timeLeft <= 3 ? 'bg-red-500' :
-                              quizState.timeLeft <= 10 ? 'bg-yellow-500' : 'bg-blue-500'
-                            }`}
-                            style={{ 
-                              width: `${(quizState.timeLeft / (quizState.currentQuestion?.timeLimit || 30)) * 100}%` 
-                            }}
-                            animate={isLowTime ? {
-                              opacity: [1, 0.5, 1]
-                            } : {}}
-                            transition={{
-                              duration: 0.5,
-                              repeat: isLowTime ? Infinity : 0
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
+              {/* Loading State */}
+              {isLoadingQuestions && (
+                <div className="text-center py-12">
+                  <motion.div
+                    animate={{
+                      rotate: 360
+                    }}
+                    transition={{
+                      duration: 1,
+                      repeat: Infinity,
+                      ease: "linear"
+                    }}
+                    className="w-12 h-12 mx-auto mb-4"
+                  >
+                    <RefreshCw className="w-12 h-12 text-blue-500" />
+                  </motion.div>
+                  <p className="text-lg font-medium text-gray-700 mb-2">Đang tải câu hỏi...</p>
+                  <p className="text-sm text-gray-500">Vui lòng chờ trong giây lát</p>
+                </div>
+              )}
+
+              {/* Error State */}
+              {!isLoadingQuestions && questionsError && (
+                <div className="text-center py-12">
+                  <motion.div
+                    animate={{
+                      scale: [1, 1.1, 1]
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity
+                    }}
+                    className="text-5xl mb-4"
+                  >
+                    ⚠️
+                  </motion.div>
+                  <h3 className="text-lg font-medium text-red-600 mb-2">Lỗi tải câu hỏi</h3>
+                  <p className="text-sm text-gray-600 mb-4">{questionsError}</p>
+                  <div className="flex justify-center gap-3">
+                    <Button onClick={() => loadQuizQuestions()} variant="outline">
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Thử lại
+                    </Button>
                   </div>
                 </div>
               )}
 
-              {/* Quiz Navigation Controls */}
-              <div className="flex items-center justify-between">
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={handlePreviousQuestion}
-                    disabled={quizState.currentQuestionIndex === 0}
-                  >
-                    <ChevronLeft className="w-4 h-4 mr-1" />
-                    Câu trước
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    onClick={handleNextQuestion}
-                    disabled={quizState.currentQuestionIndex === quizQuestions.length - 1}
-                  >
-                    Câu sau
-                    <ChevronRight className="w-4 h-4 ml-1" />
-                  </Button>
-                </div>
-
-                <div className="flex gap-2">
-                  {!quizState.isQuestionActive ? (
-                    <Button
-                      onClick={handleStartQuestion}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      <PlayCircle className="w-4 h-4 mr-2" />
-                      Bắt đầu câu hỏi
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={handleEndQuestion}
-                      variant="outline"
-                    >
-                      <PauseCircle className="w-4 h-4 mr-2" />
-                      Tạm dừng
-                    </Button>
+              {/* Quiz Content - Only show when questions are loaded successfully */}
+              {!isLoadingQuestions && !questionsError && quizQuestions.length > 0 && (
+                <>
+                  {/* Current Question Display */}
+                  {quizState.currentQuestion && (
+                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-6 mb-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge variant="outline">
+                              Câu {quizState.currentQuestion.order}
+                            </Badge>
+                            <Badge variant={
+                              quizState.currentQuestion.difficulty === 'EASY' ? 'secondary' :
+                              quizState.currentQuestion.difficulty === 'MEDIUM' ? 'default' :
+                              'destructive'
+                            }>
+                              {quizState.currentQuestion.difficulty === 'EASY' ? 'Dễ' :
+                               quizState.currentQuestion.difficulty === 'MEDIUM' ? 'Trung bình' : 'Khó'}
+                            </Badge>
+                            <Badge variant="outline">
+                              {quizState.currentQuestion.points} điểm
+                            </Badge>
+                          </div>
+                          <h3 className="text-lg font-medium text-gray-800 mb-4">
+                            {quizState.currentQuestion.content}
+                          </h3>
+                          
+                          {/* Answer Options */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {quizState.currentQuestion.options.map((option, index) => (
+                              <div
+                                key={option.id}
+                                className={`p-3 rounded-lg border-2 ${
+                                  option.isCorrect 
+                                    ? 'border-green-200 bg-green-50' 
+                                    : 'border-gray-200 bg-white'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className={`w-6 h-6 flex items-center justify-center rounded-full text-sm font-medium ${
+                                    option.isCorrect 
+                                      ? 'bg-green-500 text-white' 
+                                      : 'bg-gray-300 text-gray-700'
+                                  }`}>
+                                    {String.fromCharCode(65 + index)}
+                                  </span>
+                                  <span className="text-sm">{option.content}</span>
+                                  {option.isCorrect && (
+                                    <CheckCircle className="w-4 h-4 text-green-500 ml-auto" />
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        {/* Time Progress */}
+                        <div className="ml-6">
+                          <div className="text-center">
+                            <motion.div 
+                              className={`text-3xl font-bold ${
+                                quizState.timeLeft <= 3 ? 'text-red-500' :
+                                quizState.timeLeft <= 10 ? 'text-yellow-500' : 'text-blue-500'
+                              }`}
+                              animate={quizState.timeLeft <= 3 ? {
+                                scale: [1, 1.2, 1],
+                                textShadow: [
+                                  '0 0 0px rgba(239, 68, 68, 0)',
+                                  '0 0 20px rgba(239, 68, 68, 0.8)',
+                                  '0 0 0px rgba(239, 68, 68, 0)'
+                                ]
+                              } : {}}
+                              transition={{
+                                duration: 1,
+                                repeat: quizState.timeLeft <= 3 ? Infinity : 0
+                              }}
+                            >
+                              {quizState.timeLeft}
+                            </motion.div>
+                            <div className="text-xs text-gray-500">giây</div>
+                            <div className="w-20 h-2 bg-gray-200 rounded-full mt-2">
+                              <motion.div 
+                                className={`h-2 rounded-full transition-all duration-1000 ${
+                                  quizState.timeLeft <= 3 ? 'bg-red-500' :
+                                  quizState.timeLeft <= 10 ? 'bg-yellow-500' : 'bg-blue-500'
+                                }`}
+                                style={{ 
+                                  width: `${(quizState.timeLeft / (quizState.currentQuestion?.timeLimit || 30)) * 100}%` 
+                                }}
+                                animate={quizState.timeLeft <= 3 ? {
+                                  opacity: [1, 0.5, 1]
+                                } : {}}
+                                transition={{
+                                  duration: 0.5,
+                                  repeat: quizState.timeLeft <= 3 ? Infinity : 0
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   )}
-                  
-                  <Button
-                    onClick={handleNextQuestion}
-                    variant="outline"
-                  >
-                    <SkipForward className="w-4 h-4 mr-2" />
-                    Bỏ qua
-                  </Button>
-                </div>
-              </div>
 
-              {/* Questions Overview */}
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <h4 className="text-sm font-medium text-gray-700 mb-3">Danh sách câu hỏi:</h4>
-                <div className="grid grid-cols-5 md:grid-cols-10 gap-2">
-                  {quizQuestions.map((question, index) => (
-                    <button
-                      key={question.id}
-                      onClick={() => setQuizState(prev => ({
-                        ...prev,
-                        currentQuestionIndex: index,
-                        currentQuestion: question,
-                        timeLeft: question.timeLimit,
-                        isQuestionActive: false
-                      }))}
-                      className={`w-10 h-10 rounded-lg text-sm font-medium transition-all ${
-                        index === quizState.currentQuestionIndex
-                          ? 'bg-blue-500 text-white shadow-lg scale-110'
-                          : index < quizState.currentQuestionIndex
-                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      {index + 1}
-                    </button>
-                  ))}
+                  {/* Quiz Navigation Controls */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={handlePreviousQuestion}
+                        disabled={quizState.currentQuestionIndex === 0}
+                      >
+                        <ChevronLeft className="w-4 h-4 mr-1" />
+                        Câu trước
+                      </Button>
+                      
+                      <Button
+                        variant="outline"
+                        onClick={handleNextQuestion}
+                        disabled={quizState.currentQuestionIndex === quizQuestions.length - 1}
+                      >
+                        Câu sau
+                        <ChevronRight className="w-4 h-4 ml-1" />
+                      </Button>
+                    </div>
+
+                    <div className="flex gap-2">
+                      {!quizState.isQuestionActive ? (
+                        <Button
+                          onClick={handleStartQuestion}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          <PlayCircle className="w-4 h-4 mr-2" />
+                          Bắt đầu câu hỏi
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={handleEndQuestion}
+                          variant="outline"
+                        >
+                          <PauseCircle className="w-4 h-4 mr-2" />
+                          Tạm dừng
+                        </Button>
+                      )}
+                      
+                      <Button
+                        onClick={handleNextQuestion}
+                        variant="outline"
+                      >
+                        <SkipForward className="w-4 h-4 mr-2" />
+                        Bỏ qua
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Questions Overview */}
+                  <div className="mt-6 pt-6 border-t border-gray-200">
+                    <h4 className="text-sm font-medium text-gray-700 mb-3">Danh sách câu hỏi:</h4>
+                    <div className="grid grid-cols-5 md:grid-cols-10 gap-2">
+                      {quizQuestions.map((question, index) => (
+                        <button
+                          key={question.id}
+                          onClick={() => setQuizState(prev => ({
+                            ...prev,
+                            currentQuestionIndex: index,
+                            currentQuestion: question,
+                            timeLeft: question.timeLimit,
+                            isQuestionActive: false
+                          }))}
+                          className={`w-10 h-10 rounded-lg text-sm font-medium transition-all ${
+                            index === quizState.currentQuestionIndex
+                              ? 'bg-blue-500 text-white shadow-lg scale-110'
+                              : index < quizState.currentQuestionIndex
+                              ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                          }`}
+                        >
+                          {index + 1}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* No Questions State */}
+              {!isLoadingQuestions && !questionsError && quizQuestions.length === 0 && (
+                <div className="text-center py-12">
+                  <motion.div
+                    animate={{
+                      scale: [1, 1.05, 1]
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity
+                    }}
+                    className="text-5xl mb-4"
+                  >
+                    📝
+                  </motion.div>
+                  <h3 className="text-lg font-medium text-gray-700 mb-2">Chưa có câu hỏi</h3>
+                  <p className="text-sm text-gray-600 mb-4">Hệ thống đang chuẩn bị câu hỏi cho quiz này</p>
+                  <div className="flex justify-center gap-3">
+                    <Button onClick={() => loadQuizQuestions()} variant="outline">
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Tải lại
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              )}
             </Card>
           </motion.div>
         )}
